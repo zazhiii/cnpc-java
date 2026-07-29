@@ -1,0 +1,52 @@
+name: yudao-boot-mini-middleware
+
+services:
+  mysql:
+    image: mysql:8.0.33
+    container_name: yudao-mini-mysql
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: "123456"
+      MYSQL_DATABASE: ruoyi-vue-pro
+    ports:
+      # 3306 is already occupied by a native MySQL service on this workstation.
+      - "13306:3306"
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --explicit_defaults_for_timestamp=true
+      - --lower_case_table_names=1
+    volumes:
+      - yudao_mysql_data:/var/lib/mysql
+      - ../../sql/mysql/ruoyi-vue-pro.sql:/docker-entrypoint-initdb.d/01-ruoyi-vue-pro.sql:ro
+      - ../../sql/mysql/quartz.sql:/docker-entrypoint-initdb.d/02-quartz.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  redis:
+    image: redis:6.2-alpine
+    container_name: yudao-mini-redis
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      # 6379 is already occupied by a native Redis service on this workstation.
+      - "16379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - yudao_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  yudao_mysql_data:
+  yudao_redis_data:

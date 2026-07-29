@@ -1,0 +1,211 @@
+-- 钻头图像增强模块：方案、异步任务、版本与审核
+-- 适用数据库：MySQL 8.x
+
+CREATE TABLE IF NOT EXISTS `drill_enhance_profile` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `profile_code` varchar(64) NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `version` varchar(32) NOT NULL,
+  `applicable_drill_types` json DEFAULT NULL,
+  `applicable_photo_types` json DEFAULT NULL,
+  `pipeline_json` json NOT NULL,
+  `output_spec_json` json NOT NULL,
+  `review_policy` varchar(24) NOT NULL,
+  `status` varchar(24) NOT NULL,
+  `validation_job_id` bigint DEFAULT NULL,
+  `published_at` datetime DEFAULT NULL,
+  `remark` varchar(500) DEFAULT NULL,
+  `tenant_id` bigint NOT NULL DEFAULT 0,
+  `creator` varchar(64) DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_profile_version` (`tenant_id`,`profile_code`,`version`,`deleted`),
+  KEY `idx_profile_status` (`tenant_id`,`status`,`update_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='图像增强方案';
+
+CREATE TABLE IF NOT EXISTS `drill_enhance_job` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `job_no` varchar(48) NOT NULL,
+  `batch_id` bigint DEFAULT NULL,
+  `profile_id` bigint NOT NULL,
+  `profile_version` varchar(32) NOT NULL,
+  `status` varchar(24) NOT NULL,
+  `priority` int NOT NULL DEFAULT 5,
+  `total_count` int NOT NULL DEFAULT 0,
+  `success_count` int NOT NULL DEFAULT 0,
+  `failed_count` int NOT NULL DEFAULT 0,
+  `manual_count` int NOT NULL DEFAULT 0,
+  `idempotency_key` varchar(100) DEFAULT NULL,
+  `request_hash` char(64) DEFAULT NULL,
+  `submitted_by` bigint DEFAULT NULL,
+  `started_at` datetime DEFAULT NULL,
+  `finished_at` datetime DEFAULT NULL,
+  `error_summary` varchar(1000) DEFAULT NULL,
+  `parameter_snapshot_json` json NOT NULL,
+  `validation_job` bit(1) NOT NULL DEFAULT b'0',
+  `auto_review` bit(1) NOT NULL DEFAULT b'0',
+  `auto_publish` bit(1) NOT NULL DEFAULT b'0',
+  `remark` varchar(500) DEFAULT NULL,
+  `tenant_id` bigint NOT NULL DEFAULT 0,
+  `creator` varchar(64) DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_job_no` (`tenant_id`,`job_no`,`deleted`),
+  UNIQUE KEY `uk_job_idempotency` (`tenant_id`,`idempotency_key`,`deleted`),
+  KEY `idx_job_status` (`tenant_id`,`status`,`priority`,`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='图像增强任务';
+
+CREATE TABLE IF NOT EXISTS `drill_enhance_item` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `job_id` bigint NOT NULL,
+  `asset_id` bigint NOT NULL,
+  `status` varchar(24) NOT NULL,
+  `progress` int NOT NULL DEFAULT 0,
+  `current_step` varchar(40) DEFAULT NULL,
+  `retry_count` int NOT NULL DEFAULT 0,
+  `error_code` varchar(64) DEFAULT NULL,
+  `error_message` varchar(500) DEFAULT NULL,
+  `manual_overrides_json` json DEFAULT NULL,
+  `worker_id` varchar(100) DEFAULT NULL,
+  `lease_until` datetime DEFAULT NULL,
+  `heartbeat_time` datetime DEFAULT NULL,
+  `started_at` datetime DEFAULT NULL,
+  `finished_at` datetime DEFAULT NULL,
+  `duration_ms` bigint DEFAULT NULL,
+  `lock_version` int NOT NULL DEFAULT 0,
+  `tenant_id` bigint NOT NULL DEFAULT 0,
+  `creator` varchar(64) DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  KEY `idx_item_dispatch` (`tenant_id`,`status`,`id`),
+  KEY `idx_item_job` (`tenant_id`,`job_id`,`id`),
+  KEY `idx_item_lease` (`status`,`lease_until`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='单图增强处理项';
+
+CREATE TABLE IF NOT EXISTS `drill_image_version` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `asset_id` bigint NOT NULL,
+  `version_no` int NOT NULL,
+  `version_type` varchar(24) NOT NULL,
+  `enhance_item_id` bigint NOT NULL,
+  `file_id` bigint NOT NULL,
+  `file_config_id` bigint NOT NULL,
+  `object_key` varchar(512) NOT NULL,
+  `sha256` char(64) NOT NULL,
+  `mime_type` varchar(100) NOT NULL,
+  `file_size` bigint NOT NULL,
+  `width` int NOT NULL,
+  `height` int NOT NULL,
+  `profile_code` varchar(64) NOT NULL,
+  `profile_version` varchar(32) NOT NULL,
+  `algorithm_versions_json` json NOT NULL,
+  `parameters_json` json NOT NULL,
+  `metrics_json` json DEFAULT NULL,
+  `transform_matrix_json` json DEFAULT NULL,
+  `mask_file_id` bigint DEFAULT NULL,
+  `review_status` varchar(24) NOT NULL,
+  `publish_status` varchar(24) NOT NULL,
+  `purpose` varchar(32) DEFAULT NULL,
+  `default_version` bit(1) NOT NULL DEFAULT b'0',
+  `withdraw_reason` varchar(500) DEFAULT NULL,
+  `tenant_id` bigint NOT NULL DEFAULT 0,
+  `creator` varchar(64) DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_asset_version` (`tenant_id`,`asset_id`,`version_no`,`deleted`),
+  UNIQUE KEY `uk_enhance_item_version` (`tenant_id`,`enhance_item_id`,`deleted`),
+  KEY `idx_version_publish` (`tenant_id`,`asset_id`,`purpose`,`publish_status`,`default_version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='图片增强版本';
+
+CREATE TABLE IF NOT EXISTS `drill_enhance_step_log` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `item_id` bigint NOT NULL,
+  `step_code` varchar(40) NOT NULL,
+  `step_order` int NOT NULL,
+  `algorithm_name` varchar(100) NOT NULL,
+  `algorithm_version` varchar(50) NOT NULL,
+  `parameters_json` json DEFAULT NULL,
+  `metrics_json` json DEFAULT NULL,
+  `status` varchar(24) NOT NULL,
+  `error_code` varchar(64) DEFAULT NULL,
+  `error_message` varchar(500) DEFAULT NULL,
+  `duration_ms` bigint DEFAULT NULL,
+  `tenant_id` bigint NOT NULL DEFAULT 0,
+  `creator` varchar(64) DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  KEY `idx_step_item` (`tenant_id`,`item_id`,`step_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='图像增强步骤日志';
+
+CREATE TABLE IF NOT EXISTS `drill_image_review` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `image_version_id` bigint NOT NULL,
+  `action` varchar(24) NOT NULL,
+  `reason_code` varchar(64) DEFAULT NULL,
+  `comment` varchar(1000) DEFAULT NULL,
+  `reviewer_id` bigint NOT NULL,
+  `reviewed_at` datetime NOT NULL,
+  `tenant_id` bigint NOT NULL DEFAULT 0,
+  `creator` varchar(64) DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  KEY `idx_review_version` (`tenant_id`,`image_version_id`,`reviewed_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='图片增强审核记录';
+
+CREATE TABLE IF NOT EXISTS `drill_image_version_purpose` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `image_version_id` bigint NOT NULL,
+  `asset_id` bigint NOT NULL,
+  `purpose` varchar(32) NOT NULL,
+  `publish_status` varchar(24) NOT NULL,
+  `default_version` bit(1) NOT NULL DEFAULT b'0',
+  `default_key` varchar(128) GENERATED ALWAYS AS
+    (CASE WHEN (`default_version` = b'1' AND `deleted` = b'0' AND `publish_status` = 'PUBLISHED')
+      THEN concat(`asset_id`,':',`purpose`) ELSE NULL END) STORED,
+  `tenant_id` bigint NOT NULL DEFAULT 0,
+  `creator` varchar(64) DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_version_purpose` (`tenant_id`,`image_version_id`,`purpose`,`deleted`),
+  UNIQUE KEY `uk_asset_purpose_default` (`tenant_id`,`default_key`),
+  KEY `idx_purpose_default` (`tenant_id`,`asset_id`,`purpose`,`publish_status`,`default_version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='图片版本发布用途';
+
+-- 首个可完整执行的本地方案；智能步骤保持关闭。
+INSERT INTO `drill_enhance_profile`
+(`profile_code`,`name`,`version`,`applicable_drill_types`,`applicable_photo_types`,`pipeline_json`,
+ `output_spec_json`,`review_policy`,`status`,`tenant_id`)
+SELECT 'LOCAL_SAFE_STANDARD','本地安全标准增强','1.0.0',JSON_ARRAY(),JSON_ARRAY('BLADE','CUTTER','OVERVIEW'),
+JSON_ARRAY(
+ JSON_OBJECT('stepOrder',1,'code','SUBJECT_CROP','name','主体或刀翼裁剪','enabled',false,'algorithm','external-subject-segmentation','algorithmVersion','unconfigured','parameters',JSON_OBJECT()),
+ JSON_OBJECT('stepOrder',2,'code','ORIENTATION_NORMALIZE','name','方向尺度归一化','enabled',false,'algorithm','external-keypoint','algorithmVersion','unconfigured','parameters',JSON_OBJECT()),
+ JSON_OBJECT('stepOrder',3,'code','EXPOSURE_ADJUST','name','亮度对比度','enabled',true,'algorithm','opencv-clahe','algorithmVersion','1.0.0','parameters',JSON_OBJECT('clipLimit',2.0,'tileGridSize',8)),
+ JSON_OBJECT('stepOrder',4,'code','REFLECTION_SUPPRESSION','name','阴影反光抑制','enabled',true,'algorithm','opencv-retinex','algorithmVersion','1.0.0','parameters',JSON_OBJECT('strength',0.35)),
+ JSON_OBJECT('stepOrder',5,'code','BACKGROUND_WEAKEN','name','背景弱化','enabled',false,'algorithm','opencv-mask-guided','algorithmVersion','1.0.0','parameters',JSON_OBJECT()),
+ JSON_OBJECT('stepOrder',6,'code','CLARITY_ENHANCE','name','清晰度增强','enabled',true,'algorithm','opencv-unsharp','algorithmVersion','1.0.0','parameters',JSON_OBJECT('amount',0.6))
+),
+JSON_OBJECT('keepAspectRatio',false,'width',1024,'height',1024,'colorSpace','sRGB','format','AUTO','quality',92),
+'ALL','DRAFT',0
+WHERE NOT EXISTS (SELECT 1 FROM `drill_enhance_profile`
+ WHERE `tenant_id`=0 AND `profile_code`='LOCAL_SAFE_STANDARD' AND `version`='1.0.0' AND `deleted`=b'0');

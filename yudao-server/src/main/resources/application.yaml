@@ -12,8 +12,8 @@ spring:
   servlet:
     # 文件上传相关配置项
     multipart:
-      max-file-size: 16MB # 单个文件大小
-      max-request-size: 32MB # 设置总上传的文件大小
+      max-file-size: 30MB # 图片导入单文件上限
+      max-request-size: 300MB # 图片导入单批请求上限；更大批次使用预签名直传
 
   # Jackson 配置项
   jackson:
@@ -352,3 +352,19 @@ yudao:
       type: redis # 消息总线的类型
 
 debug: false
+
+# 钻头图像增强：默认使用数据库任务队列和本机 CPU。
+drill:
+  image-enhance:
+    executor:
+      core-size: 2
+      queue-capacity: 20
+    poll-interval: 2s
+    item-timeout: 10m
+    max-retries: 3
+    subject-service:
+      enabled: false
+    keypoint-service:
+      enabled: false
+    restoration-service:
+      enabled: false

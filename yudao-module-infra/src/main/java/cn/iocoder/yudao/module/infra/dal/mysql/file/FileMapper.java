@@ -30,4 +30,10 @@ public interface FileMapper extends BaseMapperX<FileDO> {
                 .orderByAsc(FileDO::getId));
     }
 
+    default FileDO selectLatestByUrl(String url) {
+        return selectLastOne(new LambdaQueryWrapperX<FileDO>()
+                .eq(FileDO::getUrl, url)
+                .orderByAsc(FileDO::getId));
+    }
+
 }

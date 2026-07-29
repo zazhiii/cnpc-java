@@ -55,6 +55,16 @@ public interface FileService {
     String presignGetUrl(String url, Integer expirationSeconds);
 
     /**
+     * 使用指定文件配置生成读取预签名地址。
+     *
+     * @param configId 文件配置编号
+     * @param path 对象路径
+     * @param expirationSeconds 访问有效期，单位秒
+     * @return 文件预签名地址
+     */
+    String presignGetUrl(Long configId, String path, Integer expirationSeconds);
+
+    /**
      * 创建文件
      *
      * @param createReqVO 创建信息
@@ -94,5 +104,13 @@ public interface FileService {
      * @return 文件
      */
     FileDO getFileByConfigIdAndPath(Long configId, String path);
+
+    /**
+     * 根据访问地址获得最新文件记录。
+     *
+     * @param url 文件访问地址
+     * @return 文件记录
+     */
+    FileDO getFileByUrl(String url);
 
 }

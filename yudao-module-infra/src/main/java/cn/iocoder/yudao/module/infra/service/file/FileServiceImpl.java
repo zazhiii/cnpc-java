@@ -166,6 +166,13 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
+    public String presignGetUrl(Long configId, String path, Integer expirationSeconds) {
+        FileClient fileClient = fileConfigService.getFileClient(configId);
+        Assert.notNull(fileClient, "客户端({}) 不能为空", configId);
+        return fileClient.presignGetUrl(path, expirationSeconds);
+    }
+
+    @Override
     public Long createFile(FileCreateReqVO createReqVO) {
         // 1.1 校验参数的合法性
         FilePathUtils.validatePath(createReqVO.getPath());
@@ -241,6 +248,11 @@ public class FileServiceImpl implements FileService {
     @Override
     public FileDO getFileByConfigIdAndPath(Long configId, String path) {
         return fileMapper.selectLatestByConfigIdAndPath(configId, path);
+    }
+
+    @Override
+    public FileDO getFileByUrl(String url) {
+        return fileMapper.selectLatestByUrl(url);
     }
 
 }

@@ -1,5 +1,5 @@
 server:
-  port: 48080
+  port: 10616
 
 --- #################### 数据库相关配置 ####################
 spring:
@@ -47,7 +47,7 @@ spring:
       primary: master
       datasource:
         master:
-          url: jdbc:mysql://127.0.0.1:3306/ruoyi-vue-pro?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true # MySQL Connector/J 8.X 连接的示例
+          url: jdbc:mysql://127.0.0.1:13306/ruoyi-vue-pro?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true # MySQL Connector/J 8.X 连接的示例
           #          url: jdbc:mysql://127.0.0.1:3306/ruoyi-vue-pro?useSSL=true&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&rewriteBatchedStatements=true # MySQL Connector/J 5.X 连接的示例
           #          url: jdbc:postgresql://127.0.0.1:5432/ruoyi-vue-pro # PostgreSQL 连接的示例
           #          url: jdbc:oracle:thin:@127.0.0.1:1521:xe # Oracle 连接的示例
@@ -68,7 +68,7 @@ spring:
           #          password: 123456 # 瀚高 HighGo 连接的示例
         slave: # 模拟从库，可根据自己需要修改
           lazy: true # 开启懒加载，保证启动速度
-          url: jdbc:mysql://127.0.0.1:3306/ruoyi-vue-pro?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true&nullCatalogMeansCurrent=true
+          url: jdbc:mysql://127.0.0.1:13306/ruoyi-vue-pro?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true&nullCatalogMeansCurrent=true
           username: root
           password: 123456
 #        tdengine: # IoT 数据库（需要 IoT 物联网再开启噢！）
@@ -84,7 +84,7 @@ spring:
   data:
     redis:
       host: 127.0.0.1 # 地址
-      port: 6379 # 端口
+      port: 16379 # 端口（Docker 中间件映射端口；本机 6379 已被原生 Redis 占用）
       database: 0 # 数据库索引
 #      password: dev # 密码，建议生产环境开启
 

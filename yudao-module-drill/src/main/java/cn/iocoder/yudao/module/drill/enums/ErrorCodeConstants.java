@@ -1,0 +1,39 @@
+package cn.iocoder.yudao.module.drill.enums;
+
+import cn.iocoder.yudao.framework.common.exception.ErrorCode;
+
+/**
+ * 钻头业务错误码。
+ *
+ * drill 模块使用 1-050-000-000 段。
+ */
+public interface ErrorCodeConstants {
+
+    ErrorCode IMAGE_BATCH_NOT_EXISTS = new ErrorCode(1_050_000_001, "图片导入批次不存在");
+    ErrorCode IMAGE_BATCH_STATUS_INVALID = new ErrorCode(1_050_000_002, "当前批次状态不允许执行该操作");
+    ErrorCode IMAGE_FILE_EMPTY = new ErrorCode(1_050_000_003, "导入图片不能为空");
+    ErrorCode IMAGE_FILE_TOO_LARGE = new ErrorCode(1_050_000_004, "图片大小不能超过 {} MB");
+    ErrorCode IMAGE_FORMAT_UNSUPPORTED = new ErrorCode(1_050_000_005, "不支持的图片格式：{}");
+    ErrorCode IMAGE_DECODE_FAILED = new ErrorCode(1_050_000_006, "图片无法解码或已经损坏");
+    ErrorCode IMAGE_DIMENSION_EXCEEDED = new ErrorCode(1_050_000_007, "图片像素总数不能超过 {}");
+    ErrorCode IMAGE_ASSET_NOT_EXISTS = new ErrorCode(1_050_000_008, "图片资产不存在");
+    ErrorCode IMAGE_FILE_RECORD_MISSING = new ErrorCode(1_050_000_009, "图片已上传，但文件记录创建失败");
+    ErrorCode IMAGE_HASH_MISMATCH = new ErrorCode(1_050_000_010, "图片摘要校验失败");
+    ErrorCode IMAGE_SIZE_MISMATCH = new ErrorCode(1_050_000_011, "图片大小校验失败");
+    ErrorCode IMAGE_OBJECT_NOT_FOUND = new ErrorCode(1_050_000_012, "对象存储中的图片不存在");
+    ErrorCode IMAGE_METADATA_INCOMPLETE = new ErrorCode(1_050_000_013, "图片关键业务信息不完整");
+    ErrorCode ENHANCE_PROFILE_NOT_EXISTS = new ErrorCode(1_050_000_020, "增强方案不存在");
+    ErrorCode ENHANCE_PROFILE_DUPLICATE = new ErrorCode(1_050_000_021, "增强方案编码和版本已存在");
+    ErrorCode ENHANCE_PROFILE_STATE_INVALID = new ErrorCode(1_050_000_022, "当前增强方案状态不允许该操作");
+    ErrorCode ENHANCE_PROFILE_INVALID = new ErrorCode(1_050_000_023, "增强方案配置不合法：{}");
+    ErrorCode ENHANCE_ALGORITHM_UNAVAILABLE = new ErrorCode(1_050_000_024, "增强方案引用的算法当前不可用：{}");
+    ErrorCode ENHANCE_JOB_NOT_EXISTS = new ErrorCode(1_050_000_030, "增强任务不存在");
+    ErrorCode ENHANCE_ITEM_NOT_EXISTS = new ErrorCode(1_050_000_031, "增强处理项不存在");
+    ErrorCode ENHANCE_JOB_STATE_INVALID = new ErrorCode(1_050_000_032, "当前增强任务状态不允许该操作");
+    ErrorCode ENHANCE_IDEMPOTENCY_CONFLICT = new ErrorCode(1_050_000_033, "幂等键已被不同请求使用");
+    ErrorCode IMAGE_VERSION_NOT_EXISTS = new ErrorCode(1_050_000_040, "图片增强版本不存在");
+    ErrorCode IMAGE_VERSION_STATE_INVALID = new ErrorCode(1_050_000_041, "当前图片版本状态不允许该操作");
+    ErrorCode IMAGE_VERSION_STORAGE_ERROR = new ErrorCode(1_050_000_042, "增强图片存储失败");
+    ErrorCode INVALID_MANUAL_OVERRIDE = new ErrorCode(1_050_000_043, "人工修正参数不合法：{}");
+
+}
