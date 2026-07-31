@@ -8,6 +8,7 @@ import lombok.EqualsAndHashCode;
 
 import java.time.LocalDateTime;
 
+// 图像增强方案
 @TableName("drill_enhance_profile")
 @KeySequence("drill_enhance_profile_seq")
 @Data

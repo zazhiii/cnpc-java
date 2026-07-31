@@ -13,6 +13,9 @@ import cn.iocoder.yudao.module.drill.dal.mysql.enhance.EnhanceProfileMapper;
 import cn.iocoder.yudao.module.drill.dal.mysql.image.ImageAssetMapper;
 import cn.iocoder.yudao.module.drill.dal.mysql.image.ImageBatchMapper;
 import cn.iocoder.yudao.module.drill.service.enhance.EnhanceJobService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -29,26 +32,42 @@ import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
+@Tag(name = "管理后台 - 图像增强任务")
 @RestController
 @RequestMapping("/drill/enhance-job")
 @Validated
 public class EnhanceJobController {
-    @Resource private EnhanceJobService service;
+    @Resource private EnhanceJobService enhanceJobService;
     @Resource private EnhanceProfileMapper profileMapper;
     @Resource private EnhanceItemMapper itemMapper;
     @Resource private ImageAssetMapper assetMapper;
     @Resource private ImageBatchMapper batchMapper;
 
+    /**
+     * 创建图像增强任务。
+     *
+     * <p>客户端可通过 {@code Idempotency-Key} 标识同一次创建请求。相同幂等键及相同请求内容
+     * 会返回已创建的任务编号，避免因网络重试而重复创建任务。</p>
+     *
+     * @param createReqVO 创建任务参数
+     * @param idempotencyKey 幂等键，可选
+     * @return 新建或已存在的增强任务编号
+     */
     @PostMapping("/create")
+    @Operation(summary = "创建图像增强任务")
     @PreAuthorize("@ss.hasPermission('drill:enhance-job:create')")
-    public CommonResult<Long> create(@Valid @RequestBody EnhanceJobVO.CreateReq req,
-            @RequestHeader(value = "Idempotency-Key", required = false) String key) {
-        return success(service.create(req, key));
+    public CommonResult<Long> createEnhanceJob(
+            @Valid @RequestBody EnhanceJobVO.CreateReq createReqVO,
+            @Parameter(description = "请求幂等键，用于避免重复创建任务")
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        Long enhanceJobId = enhanceJobService.create(createReqVO, idempotencyKey);
+        return success(enhanceJobId);
     }
+
     @GetMapping("/page")
     @PreAuthorize("@ss.hasPermission('drill:enhance-job:query')")
     public CommonResult<PageResult<EnhanceJobVO.Resp>> page(@Valid EnhanceJobPageReqVO req) {
-        PageResult<EnhanceJobDO> page = service.getPage(req);
+        PageResult<EnhanceJobDO> page = enhanceJobService.getPage(req);
         Set<Long> profileIds = page.getList().stream().map(EnhanceJobDO::getProfileId)
                 .filter(Objects::nonNull).collect(Collectors.toSet());
         Set<Long> batchIds = page.getList().stream().map(EnhanceJobDO::getBatchId)
@@ -69,14 +88,14 @@ public class EnhanceJobController {
     @GetMapping("/get")
     @PreAuthorize("@ss.hasPermission('drill:enhance-job:query')")
     public CommonResult<EnhanceJobVO.Resp> get(@RequestParam Long id) {
-        EnhanceJobDO job = service.get(id);
+        EnhanceJobDO job = enhanceJobService.get(id);
         return success(convertJob(job, profileMapper.selectById(job.getProfileId()),
                 job.getBatchId() == null ? null : batchMapper.selectById(job.getBatchId())));
     }
     @GetMapping("/item/list")
     @PreAuthorize("@ss.hasPermission('drill:enhance-job:query')")
     public CommonResult<List<EnhanceJobVO.ItemResp>> items(@RequestParam Long jobId) {
-        List<EnhanceItemDO> items = service.getItems(jobId);
+        List<EnhanceItemDO> items = enhanceJobService.getItems(jobId);
         Set<Long> assetIds = items.stream().map(EnhanceItemDO::getAssetId)
                 .filter(Objects::nonNull).collect(Collectors.toSet());
         Map<Long, ImageAssetDO> assets = assetIds.isEmpty() ? Map.of()
@@ -96,24 +115,24 @@ public class EnhanceJobController {
     @GetMapping("/item/steps")
     @PreAuthorize("@ss.hasPermission('drill:enhance-job:query')")
     public CommonResult<List<EnhanceJobVO.StepResp>> steps(@RequestParam Long itemId) {
-        return success(BeanUtils.toBean(service.getSteps(itemId), EnhanceJobVO.StepResp.class));
+        return success(BeanUtils.toBean(enhanceJobService.getSteps(itemId), EnhanceJobVO.StepResp.class));
     }
     @GetMapping("/statistics")
     @PreAuthorize("@ss.hasPermission('drill:enhance-job:query')")
     public CommonResult<EnhanceJobVO.StatisticsResp> statistics() {
-        return success(service.getStatistics());
+        return success(enhanceJobService.getStatistics());
     }
     @PostMapping("/item/retry")
     @PreAuthorize("@ss.hasPermission('drill:enhance-job:retry')")
     public CommonResult<Boolean> retry(@RequestParam Long id, @RequestBody(required = false) EnhanceJobVO.RetryReq req) {
-        service.retryItem(id, req); return success(true);
+        enhanceJobService.retryItem(id, req); return success(true);
     }
     @PostMapping("/retry-failed")
     @PreAuthorize("@ss.hasPermission('drill:enhance-job:retry')")
-    public CommonResult<Boolean> retryFailed(@RequestParam Long id) { service.retryFailed(id); return success(true); }
+    public CommonResult<Boolean> retryFailed(@RequestParam Long id) { enhanceJobService.retryFailed(id); return success(true); }
     @PutMapping("/cancel")
     @PreAuthorize("@ss.hasPermission('drill:enhance-job:create')")
-    public CommonResult<Boolean> cancel(@RequestParam Long id) { service.cancel(id); return success(true); }
+    public CommonResult<Boolean> cancel(@RequestParam Long id) { enhanceJobService.cancel(id); return success(true); }
 
     private EnhanceJobVO.Resp convertJob(EnhanceJobDO job, EnhanceProfileDO profile, ImageBatchDO batch) {
         EnhanceJobVO.Resp resp = BeanUtils.toBean(job, EnhanceJobVO.Resp.class);
