@@ -5,17 +5,25 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.drill.controller.admin.image.vo.batch.ImageBatchCreateReqVO;
 import cn.iocoder.yudao.module.drill.controller.admin.image.vo.batch.ImageBatchPageReqVO;
+import cn.iocoder.yudao.module.drill.dal.dataobject.image.ImageAssetDO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.image.ImageBatchDO;
+import cn.iocoder.yudao.module.drill.dal.mysql.enhance.EnhanceJobMapper;
+import cn.iocoder.yudao.module.drill.dal.mysql.enhance.ImageVersionMapper;
+import cn.iocoder.yudao.module.drill.dal.mysql.image.ImageAssetMapper;
 import cn.iocoder.yudao.module.drill.dal.mysql.image.ImageBatchMapper;
+import cn.iocoder.yudao.module.drill.dal.mysql.image.ImageImportRecordMapper;
+import cn.iocoder.yudao.module.infra.service.file.FileService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Set;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.IMAGE_BATCH_HAS_ENHANCE_JOBS;
 import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.IMAGE_BATCH_NOT_EXISTS;
 import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.IMAGE_BATCH_STATUS_INVALID;
 import static cn.iocoder.yudao.module.drill.enums.ImageImportConstants.*;
@@ -30,12 +38,23 @@ public class ImageBatchServiceImpl implements ImageBatchService {
 
     @Resource
     private ImageBatchMapper imageBatchMapper;
+    @Resource
+    private ImageAssetMapper imageAssetMapper;
+    @Resource
+    private ImageImportRecordMapper imageImportRecordMapper;
+    @Resource
+    private EnhanceJobMapper enhanceJobMapper;
+    @Resource
+    private ImageVersionMapper imageVersionMapper;
+    @Resource
+    private FileService fileService;
 
     @Override
     public Long createBatch(ImageBatchCreateReqVO createReqVO) {
         ImageBatchDO batch = BeanUtils.toBean(createReqVO, ImageBatchDO.class);
         batch.setBatchNo("IMG-" + LocalDateTime.now().format(BATCH_NO_FORMATTER)
                 + "-" + RandomUtil.randomNumbers(4));
+        batch.setSourceType(SOURCE_LOCAL_UPLOAD);
         batch.setStatus(BATCH_STATUS_IMPORTING);
         batch.setTotalCount(0);
         batch.setSuccessCount(0);
@@ -71,17 +90,27 @@ public class ImageBatchServiceImpl implements ImageBatchService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void archiveBatch(Long id) {
-        ImageBatchDO batch = getBatch(id);
-        if (BATCH_STATUS_ARCHIVED.equals(batch.getStatus())) {
-            return;
+    public void deleteBatch(Long id) throws Exception {
+        getBatch(id);
+        if (enhanceJobMapper.selectCountByBatchId(id) > 0) {
+            throw exception(IMAGE_BATCH_HAS_ENHANCE_JOBS);
         }
-        if (BATCH_STATUS_IMPORTING.equals(batch.getStatus())) {
-            throw exception(IMAGE_BATCH_STATUS_INVALID);
+        List<ImageAssetDO> assets = imageAssetMapper.selectByBatchId(id);
+        if (imageVersionMapper.selectCountByAssetIds(
+                assets.stream().map(ImageAssetDO::getId).toList()) > 0) {
+            throw exception(IMAGE_BATCH_HAS_ENHANCE_JOBS);
         }
-        imageBatchMapper.updateById(new ImageBatchDO()
-                .setId(id)
-                .setStatus(BATCH_STATUS_ARCHIVED));
+        List<Long> fileIds = assets.stream()
+                .map(ImageAssetDO::getOriginalFileId)
+                .filter(fileId -> fileId != null)
+                .distinct()
+                .toList();
+        if (!fileIds.isEmpty()) {
+            fileService.deleteFileList(fileIds);
+        }
+        imageImportRecordMapper.deleteByBatchId(id);
+        imageAssetMapper.deleteByBatchId(id);
+        imageBatchMapper.deleteById(id);
     }
 
     @Override
@@ -89,6 +118,11 @@ public class ImageBatchServiceImpl implements ImageBatchService {
                                        int duplicate, int pendingMetadata) {
         imageBatchMapper.updateImportStatistics(id, total, success, failed,
                 duplicate, pendingMetadata);
+    }
+
+    @Override
+    public void refreshMetadataStatistics(Long id) {
+        imageBatchMapper.refreshMetadataStatistics(id);
     }
 
 }

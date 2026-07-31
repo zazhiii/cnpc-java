@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS `drill_image_version` (
   `asset_id` bigint NOT NULL,
   `version_no` int NOT NULL,
   `version_type` varchar(24) NOT NULL,
-  `enhance_item_id` bigint NOT NULL,
+  `enhance_item_id` bigint NOT NULL COMMENT '增强处理项编号；原始图片版本使用资产编号的负数',
   `file_id` bigint NOT NULL,
   `file_config_id` bigint NOT NULL,
   `object_key` varchar(512) NOT NULL,

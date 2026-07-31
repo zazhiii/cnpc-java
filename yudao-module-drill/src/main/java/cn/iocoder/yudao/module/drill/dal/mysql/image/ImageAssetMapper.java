@@ -5,7 +5,10 @@ import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.drill.controller.admin.image.vo.asset.ImageAssetPageReqVO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.image.ImageAssetDO;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.apache.ibatis.annotations.Mapper;
+
+import java.util.List;
 
 @Mapper
 public interface ImageAssetMapper extends BaseMapperX<ImageAssetDO> {
@@ -28,6 +31,16 @@ public interface ImageAssetMapper extends BaseMapperX<ImageAssetDO> {
 
     default ImageAssetDO selectBySha256(String sha256) {
         return selectOne(ImageAssetDO::getSha256, sha256);
+    }
+
+    default List<ImageAssetDO> selectByBatchId(Long batchId) {
+        return selectList(new LambdaQueryWrapper<ImageAssetDO>()
+                .eq(ImageAssetDO::getBatchId, batchId));
+    }
+
+    default void deleteByBatchId(Long batchId) {
+        delete(new LambdaQueryWrapper<ImageAssetDO>()
+                .eq(ImageAssetDO::getBatchId, batchId));
     }
 
 }

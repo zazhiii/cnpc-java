@@ -13,5 +13,7 @@ public interface EnhanceProfileService {
     Long copy(EnhanceProfileVO.CopyReq req);
     Long validateProfile(EnhanceProfileVO.ValidateReq req, String idempotencyKey);
     void publish(Long id);
+    void enable(Long id);
     void disable(Long id);
+    void delete(Long id);
 }

@@ -81,7 +81,7 @@ public class ImageAssetServiceImpl implements ImageAssetService {
             String originalName = StrUtil.blankToDefault(file.getOriginalFilename(), "unnamed-image");
             try {
                 byte[] content = IoUtil.readBytes(file.getInputStream());
-                Candidate candidate = fromUploadRequest(uploadReqVO, originalName, content);
+                Candidate candidate = fromUploadedFile(originalName, content);
                 ImageImportRespVO.Item item = importDirectFile(batch, candidate, file.getContentType());
                 addItem(result, item, candidate.getMetadataStatus());
             } catch (Exception ex) {
@@ -145,6 +145,7 @@ public class ImageAssetServiceImpl implements ImageAssetService {
         asset.setMetadataStatus(resolveMetadataStatus(asset.getDrillCode(), asset.getPhotoType(),
                 asset.getBladeNo(), "PENDING"));
         imageAssetMapper.updateById(asset);
+        imageBatchService.refreshMetadataStatistics(asset.getBatchId());
     }
 
     private ImageImportRespVO.Item importDirectFile(ImageBatchDO batch, Candidate candidate,
@@ -223,7 +224,7 @@ public class ImageAssetServiceImpl implements ImageAssetService {
         return item;
     }
 
-    private Candidate fromUploadRequest(ImageAssetUploadReqVO reqVO, String originalName, byte[] content) {
+    private Candidate fromUploadedFile(String originalName, byte[] content) {
         ImageFileValidator.ImageInfo imageInfo = imageFileValidator.validate(content, originalName);
         Candidate candidate = new Candidate();
         candidate.setOriginalName(originalName);
@@ -232,14 +233,7 @@ public class ImageAssetServiceImpl implements ImageAssetService {
         candidate.setWidth(imageInfo.getWidth());
         candidate.setHeight(imageInfo.getHeight());
         candidate.setMimeType(imageInfo.getMimeType());
-        candidate.setDrillCode(reqVO.getDrillCode());
-        candidate.setDrillType(reqVO.getDrillType());
-        candidate.setSceneType(reqVO.getSceneType());
-        candidate.setPhotoType(reqVO.getPhotoType());
-        candidate.setBladeNo(reqVO.getBladeNo());
-        candidate.setRemark(reqVO.getRemark());
-        candidate.setMetadataStatus(resolveMetadataStatus(candidate.getDrillCode(), candidate.getPhotoType(),
-                candidate.getBladeNo(), reqVO.getUnknownMetadataPolicy()));
+        candidate.setMetadataStatus(METADATA_STATUS_PENDING);
         return candidate;
     }
 

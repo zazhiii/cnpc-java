@@ -52,12 +52,12 @@ public class ImageBatchController {
         return success(BeanUtils.toBean(imageBatchService.getBatch(id), ImageBatchRespVO.class));
     }
 
-    @PutMapping("/archive")
-    @Operation(summary = "归档图片导入批次")
+    @DeleteMapping("/delete")
+    @Operation(summary = "删除图片导入批次及关联图片")
     @Parameter(name = "id", description = "批次编号", required = true)
     @PreAuthorize("@ss.hasPermission('drill:image-batch:import')")
-    public CommonResult<Boolean> archiveBatch(@RequestParam("id") Long id) {
-        imageBatchService.archiveBatch(id);
+    public CommonResult<Boolean> deleteBatch(@RequestParam("id") Long id) throws Exception {
+        imageBatchService.deleteBatch(id);
         return success(true);
     }
 

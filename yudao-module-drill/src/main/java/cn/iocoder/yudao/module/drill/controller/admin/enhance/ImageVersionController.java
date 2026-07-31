@@ -22,6 +22,12 @@ public class ImageVersionController {
     @PreAuthorize("@ss.hasPermission('drill:image-asset:query')")
     public CommonResult<ImageVersionDO> get(@RequestParam Long id) { return success(service.get(id)); }
 
+    @GetMapping("/by-item")
+    @PreAuthorize("@ss.hasPermission('drill:image-asset:query')")
+    public CommonResult<ImageVersionDO> getByItem(@RequestParam Long itemId) {
+        return success(service.getByEnhanceItemId(itemId));
+    }
+
     @PostMapping("/{id}/review")
     @PreAuthorize("@ss.hasPermission('drill:image-version:review')")
     public CommonResult<Boolean> review(@PathVariable Long id, @Valid @RequestBody ImageVersionVO.ReviewReq req) {
@@ -32,6 +38,13 @@ public class ImageVersionController {
     @PreAuthorize("@ss.hasPermission('drill:image-version:publish')")
     public CommonResult<Boolean> publish(@PathVariable Long id, @Valid @RequestBody ImageVersionVO.PublishReq req) {
         service.publish(id, req); return success(true);
+    }
+
+    @PostMapping("/original/{assetId}/publish")
+    @PreAuthorize("@ss.hasPermission('drill:image-version:publish')")
+    public CommonResult<Boolean> publishOriginal(@PathVariable Long assetId,
+                                                  @Valid @RequestBody ImageVersionVO.PublishReq req) {
+        service.publishOriginal(assetId, req); return success(true);
     }
 
     @PostMapping("/{id}/withdraw")

@@ -16,6 +16,7 @@ public class ImageEnhanceProperties {
     private ExternalService subjectService = new ExternalService();
     private ExternalService keypointService = new ExternalService();
     private ExternalService restorationService = new ExternalService();
+    private OpenApi openApi = new OpenApi();
 
     @Data
     public static class Executor {
@@ -30,5 +31,13 @@ public class ImageEnhanceProperties {
         private String apiKey;
         private String modelVersion;
         private Duration timeout = Duration.ofSeconds(30);
+    }
+
+    @Data
+    public static class OpenApi {
+        /**
+         * 对外暴露的服务根地址，例如 https://example.com。为空时根据当前请求生成。
+         */
+        private String publicBaseUrl;
     }
 }

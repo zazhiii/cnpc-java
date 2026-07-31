@@ -117,6 +117,20 @@ public class EnhanceProfileServiceImpl implements EnhanceProfileService {
     }
 
     @Override
+    public void enable(Long id) {
+        EnhanceProfileDO profile = get(id);
+        if (!Set.of(PROFILE_DRAFT, PROFILE_DISABLED).contains(profile.getStatus())) {
+            throw exception(ENHANCE_PROFILE_STATE_INVALID);
+        }
+        validateExternalAvailability(JsonUtils.parseArray(profile.getPipelineJson(), StepConfig.class));
+        EnhanceProfileDO update = new EnhanceProfileDO();
+        update.setId(id);
+        update.setStatus(PROFILE_ENABLED);
+        update.setPublishedAt(LocalDateTime.now());
+        profileMapper.updateById(update);
+    }
+
+    @Override
     public void disable(Long id) {
         EnhanceProfileDO profile = get(id);
         if (!PROFILE_ENABLED.equals(profile.getStatus())) throw exception(ENHANCE_PROFILE_STATE_INVALID);
@@ -124,6 +138,19 @@ public class EnhanceProfileServiceImpl implements EnhanceProfileService {
         update.setId(id);
         update.setStatus(PROFILE_DISABLED);
         profileMapper.updateById(update);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void delete(Long id) {
+        EnhanceProfileDO profile = get(id);
+        if (!Set.of(PROFILE_DRAFT, PROFILE_DISABLED).contains(profile.getStatus())) {
+            throw exception(ENHANCE_PROFILE_STATE_INVALID);
+        }
+        if (enhanceJobMapper.selectCountByProfileId(id) > 0) {
+            throw exception(ENHANCE_PROFILE_IN_USE);
+        }
+        profileMapper.deleteById(id);
     }
 
     private void normalizeAndValidate(EnhanceProfileVO.SaveReq req, boolean requireAvailable) {

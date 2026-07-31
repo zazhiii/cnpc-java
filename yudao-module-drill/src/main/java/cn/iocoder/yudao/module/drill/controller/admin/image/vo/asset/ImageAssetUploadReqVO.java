@@ -15,12 +15,4 @@ public class ImageAssetUploadReqVO {
     @NotNull(message = "图片文件不能为空")
     private MultipartFile[] files;
 
-    private String drillCode;
-    private String drillType;
-    private String sceneType;
-    private String photoType;
-    private String bladeNo;
-    private String unknownMetadataPolicy = "PENDING";
-    private String remark;
-
 }

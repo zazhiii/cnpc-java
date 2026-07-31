@@ -47,4 +47,27 @@ public interface ImageBatchMapper extends BaseMapperX<ImageBatchDO> {
                                @Param("duplicate") int duplicate,
                                @Param("pendingMetadata") int pendingMetadata);
 
+    @Update("""
+            UPDATE drill_image_batch b
+            LEFT JOIN (
+                SELECT batch_id, COUNT(*) AS pending_count
+                FROM drill_image_asset
+                WHERE batch_id = #{id}
+                  AND metadata_status = 'PENDING'
+                  AND deleted = 0
+                GROUP BY batch_id
+            ) asset_stats ON asset_stats.batch_id = b.id
+            SET b.pending_metadata_count = COALESCE(asset_stats.pending_count, 0),
+                b.status = CASE
+                    WHEN b.status IN ('PROCESSING', 'COMPLETED') THEN b.status
+                    WHEN COALESCE(asset_stats.pending_count, 0) > 0 THEN 'PENDING_METADATA'
+                    WHEN b.failed_count > 0 THEN 'PARTIAL_SUCCESS'
+                    ELSE 'PENDING_PROCESS'
+                END,
+                b.update_time = CURRENT_TIMESTAMP
+            WHERE b.id = #{id}
+              AND b.deleted = 0
+            """)
+    int refreshMetadataStatistics(@Param("id") Long id);
+
 }

@@ -362,6 +362,9 @@ drill:
     poll-interval: 2s
     item-timeout: 10m
     max-retries: 3
+    open-api:
+      # 生产环境建议配置为外部模型实际可访问的服务根地址；为空时根据当前请求生成。
+      public-base-url:
     subject-service:
       enabled: false
     keypoint-service:

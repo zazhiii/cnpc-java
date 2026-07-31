@@ -69,10 +69,22 @@ public class EnhanceProfileController {
         service.publish(id); return success(true);
     }
 
+    @PutMapping("/enable")
+    @PreAuthorize("@ss.hasPermission('drill:enhance-profile:manage')")
+    public CommonResult<Boolean> enable(@RequestParam Long id) {
+        service.enable(id); return success(true);
+    }
+
     @PutMapping("/disable")
     @PreAuthorize("@ss.hasPermission('drill:enhance-profile:manage')")
     public CommonResult<Boolean> disable(@RequestParam Long id) {
         service.disable(id); return success(true);
+    }
+
+    @DeleteMapping("/delete")
+    @PreAuthorize("@ss.hasPermission('drill:enhance-profile:manage')")
+    public CommonResult<Boolean> delete(@RequestParam Long id) {
+        service.delete(id); return success(true);
     }
 
     private EnhanceProfileVO.Resp convert(EnhanceProfileDO profile) {

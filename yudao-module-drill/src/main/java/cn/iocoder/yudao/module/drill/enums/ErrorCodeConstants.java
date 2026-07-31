@@ -22,11 +22,14 @@ public interface ErrorCodeConstants {
     ErrorCode IMAGE_SIZE_MISMATCH = new ErrorCode(1_050_000_011, "图片大小校验失败");
     ErrorCode IMAGE_OBJECT_NOT_FOUND = new ErrorCode(1_050_000_012, "对象存储中的图片不存在");
     ErrorCode IMAGE_METADATA_INCOMPLETE = new ErrorCode(1_050_000_013, "图片关键业务信息不完整");
+    ErrorCode IMAGE_BATCH_HAS_ENHANCE_JOBS = new ErrorCode(1_050_000_014,
+            "该批次已有增强任务或发布版本，不能删除");
     ErrorCode ENHANCE_PROFILE_NOT_EXISTS = new ErrorCode(1_050_000_020, "增强方案不存在");
     ErrorCode ENHANCE_PROFILE_DUPLICATE = new ErrorCode(1_050_000_021, "增强方案编码和版本已存在");
     ErrorCode ENHANCE_PROFILE_STATE_INVALID = new ErrorCode(1_050_000_022, "当前增强方案状态不允许该操作");
     ErrorCode ENHANCE_PROFILE_INVALID = new ErrorCode(1_050_000_023, "增强方案配置不合法：{}");
     ErrorCode ENHANCE_ALGORITHM_UNAVAILABLE = new ErrorCode(1_050_000_024, "增强方案引用的算法当前不可用：{}");
+    ErrorCode ENHANCE_PROFILE_IN_USE = new ErrorCode(1_050_000_025, "增强方案已被任务引用，不能删除");
     ErrorCode ENHANCE_JOB_NOT_EXISTS = new ErrorCode(1_050_000_030, "增强任务不存在");
     ErrorCode ENHANCE_ITEM_NOT_EXISTS = new ErrorCode(1_050_000_031, "增强处理项不存在");
     ErrorCode ENHANCE_JOB_STATE_INVALID = new ErrorCode(1_050_000_032, "当前增强任务状态不允许该操作");
@@ -35,5 +38,9 @@ public interface ErrorCodeConstants {
     ErrorCode IMAGE_VERSION_STATE_INVALID = new ErrorCode(1_050_000_041, "当前图片版本状态不允许该操作");
     ErrorCode IMAGE_VERSION_STORAGE_ERROR = new ErrorCode(1_050_000_042, "增强图片存储失败");
     ErrorCode INVALID_MANUAL_OVERRIDE = new ErrorCode(1_050_000_043, "人工修正参数不合法：{}");
+    ErrorCode IMAGE_ACCESS_INVALID_PURPOSE = new ErrorCode(1_050_000_044, "不支持的增强图片用途：{}");
+    ErrorCode IMAGE_ACCESS_CURSOR_INVALID = new ErrorCode(1_050_000_045, "增强图片查询游标不合法");
+    ErrorCode IMAGE_ACCESS_NOT_PUBLISHED = new ErrorCode(1_050_000_046, "图片版本未针对指定用途发布或已撤回");
+    ErrorCode IMAGE_ACCESS_CONTENT_MISSING = new ErrorCode(1_050_000_047, "增强图片文件不存在");
 
 }

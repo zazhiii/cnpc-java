@@ -1,19 +1,28 @@
 package cn.iocoder.yudao.module.system.service.oauth2;
 
 import cn.hutool.core.lang.Assert;
+import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
+import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
+import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.module.system.dal.dataobject.oauth2.OAuth2AccessTokenDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.oauth2.OAuth2ClientDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.oauth2.OAuth2CodeDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.enums.ErrorCodeConstants;
 import cn.iocoder.yudao.module.system.service.auth.AdminAuthService;
+import cn.iocoder.yudao.module.system.service.tenant.TenantService;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.Resource;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
+import static cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstants.BAD_REQUEST;
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 
 /**
@@ -24,12 +33,18 @@ import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionU
 @Service
 public class OAuth2GrantServiceImpl implements OAuth2GrantService {
 
+    private static final Set<String> DRILL_IMAGE_SCOPES = Set.of("drill:image:read", "drill:image:download");
+
     @Resource
     private OAuth2TokenService oauth2TokenService;
+    @Resource
+    private OAuth2ClientService oauth2ClientService;
     @Resource
     private OAuth2CodeService oauth2CodeService;
     @Resource
     private AdminAuthService adminAuthService;
+    @Resource
+    private TenantService tenantService;
 
     @Override
     public OAuth2AccessTokenDO grantImplicit(Long userId, Integer userType,
@@ -86,6 +101,19 @@ public class OAuth2GrantServiceImpl implements OAuth2GrantService {
 
     @Override
     public OAuth2AccessTokenDO grantClientCredentials(String clientId, List<String> scopes) {
+        if (scopes != null && scopes.stream().anyMatch(DRILL_IMAGE_SCOPES::contains)) {
+            OAuth2ClientDO client = oauth2ClientService.validOAuthClientFromCache(clientId);
+            Map<String, Object> additionalInformation = JsonUtils.parseObject(
+                    StrUtil.blankToDefault(client.getAdditionalInformation(), "{}"), Map.class);
+            Long tenantId = MapUtil.getLong(additionalInformation, "tenantId");
+            if (tenantId == null || tenantId <= 0) {
+                throw exception0(BAD_REQUEST.getCode(),
+                        "图像开放接口客户端必须在附加信息中配置合法的 tenantId");
+            }
+            tenantService.validTenant(tenantId);
+            return TenantUtils.execute(tenantId,
+                    () -> oauth2TokenService.createAccessToken(0L, UserTypeEnum.ADMIN.getValue(), clientId, scopes));
+        }
         // 特殊：https://yuanbao.tencent.com/bot/app/share/chat/wFj642xSZHHx
         return oauth2TokenService.createAccessToken(0L, UserTypeEnum.ADMIN.getValue(), clientId, scopes);
     }

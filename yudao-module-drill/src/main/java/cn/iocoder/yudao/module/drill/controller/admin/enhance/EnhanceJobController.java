@@ -60,7 +60,9 @@ public class EnhanceJobController {
                 : batchMapper.selectByIds(batchIds).stream()
                         .collect(Collectors.toMap(ImageBatchDO::getId, Function.identity()));
         List<EnhanceJobVO.Resp> list = page.getList().stream()
-                .map(job -> convertJob(job, profiles.get(job.getProfileId()), batches.get(job.getBatchId())))
+                .map(job -> convertJob(job,
+                        job.getProfileId() == null ? null : profiles.get(job.getProfileId()),
+                        job.getBatchId() == null ? null : batches.get(job.getBatchId())))
                 .toList();
         return success(new PageResult<>(list, page.getTotal()));
     }
@@ -82,7 +84,7 @@ public class EnhanceJobController {
                         .collect(Collectors.toMap(ImageAssetDO::getId, Function.identity()));
         return success(items.stream().map(item -> {
             EnhanceJobVO.ItemResp resp = BeanUtils.toBean(item, EnhanceJobVO.ItemResp.class);
-            ImageAssetDO asset = assets.get(item.getAssetId());
+            ImageAssetDO asset = item.getAssetId() == null ? null : assets.get(item.getAssetId());
             if (asset != null) {
                 resp.setAssetNo(asset.getAssetNo());
                 resp.setOriginalName(asset.getOriginalName());

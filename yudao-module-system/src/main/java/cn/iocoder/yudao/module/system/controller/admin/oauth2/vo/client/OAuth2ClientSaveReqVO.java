@@ -9,6 +9,7 @@ import org.hibernate.validator.constraints.URL;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.util.List;
 
 @Schema(description = "管理后台 - OAuth2 客户端创建/修改 Request VO")
@@ -33,6 +34,7 @@ public class OAuth2ClientSaveReqVO {
     @Schema(description = "应用图标", requiredMode = Schema.RequiredMode.REQUIRED, example = "https://www.iocoder.cn/xx.png")
     @NotNull(message = "应用图标不能为空")
     @URL(message = "应用图标的地址不正确")
+    @Size(max = 2048, message = "应用图标地址不能超过 2048 个字符")
     private String logo;
 
     @Schema(description = "应用描述", example = "我是一个应用")

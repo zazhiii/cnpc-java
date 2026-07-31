@@ -15,9 +15,11 @@ public interface ImageBatchService {
 
     ImageBatchDO validateBatchForImport(Long id);
 
-    void archiveBatch(Long id);
+    void deleteBatch(Long id) throws Exception;
 
     void updateImportStatistics(Long id, int total, int success, int failed,
                                 int duplicate, int pendingMetadata);
+
+    void refreshMetadataStatistics(Long id);
 
 }
