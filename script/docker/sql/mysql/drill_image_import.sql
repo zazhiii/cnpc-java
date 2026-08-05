@@ -1,6 +1,5 @@
 -- 钻头图像增强模块：存量图片导入
 -- 适用数据库：MySQL 8.x
--- 执行前请确认当前数据库为 ruoyi-vue-pro
 
 CREATE TABLE IF NOT EXISTS `drill_image_batch` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '批次编号',

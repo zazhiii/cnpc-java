@@ -43,4 +43,9 @@ public interface ErrorCodeConstants {
     ErrorCode IMAGE_ACCESS_NOT_PUBLISHED = new ErrorCode(1_050_000_046, "图片版本未针对指定用途发布或已撤回");
     ErrorCode IMAGE_ACCESS_CONTENT_MISSING = new ErrorCode(1_050_000_047, "增强图片文件不存在");
 
+    ErrorCode APP_COLLECTION_TASK_NOT_EXISTS = new ErrorCode(1_050_000_060, "采集任务不存在");
+    ErrorCode APP_COLLECTION_PHOTO_EMPTY = new ErrorCode(1_050_000_061, "采集照片不能为空或无法读取");
+    ErrorCode APP_COLLECTION_INCOMPLETE = new ErrorCode(1_050_000_062,
+            "必拍照片未完成，当前 {} 张，至少需要 {} 张");
+
 }

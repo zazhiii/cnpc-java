@@ -1,14 +1,15 @@
-name: yudao-boot-mini-middleware
+name: cnpc-middleware
 
 services:
   mysql:
     image: mysql:8.0.33
-    container_name: yudao-mini-mysql
+    container_name: cnpc-mysql
     restart: unless-stopped
     environment:
       TZ: Asia/Shanghai
-      MYSQL_ROOT_PASSWORD: "123456"
-      MYSQL_DATABASE: ruoyi-vue-pro
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-123456}
+      # 项目数据库名固定为 cnpc_drill，避免环境变量将 SQL 导入其它数据库。
+      MYSQL_DATABASE: cnpc_drill
     ports:
       # 3306 is already occupied by a native MySQL service on this workstation.
       - "13306:3306"
@@ -19,11 +20,16 @@ services:
       - --explicit_defaults_for_timestamp=true
       - --lower_case_table_names=1
     volumes:
-      - yudao_mysql_data:/var/lib/mysql
-      - ../../sql/mysql/ruoyi-vue-pro.sql:/docker-entrypoint-initdb.d/01-ruoyi-vue-pro.sql:ro
-      - ../../sql/mysql/quartz.sql:/docker-entrypoint-initdb.d/02-quartz.sql:ro
+      - ./cnpc_mysql_data:/var/lib/mysql # 挂载数据
+      - ./sql/mysql/ruoyi-vue-pro.sql:/docker-entrypoint-initdb.d/01-cnpc-drill.sql:ro # 仅在 MySQL 数据目录为空时自动执行
+      - ./sql/mysql/quartz.sql:/docker-entrypoint-initdb.d/02-quartz.sql:ro
+      - ./sql/mysql/drill_image_import.sql:/docker-entrypoint-initdb.d/03-drill-image-import.sql:ro
+      - ./sql/mysql/drill_image_enhance.sql:/docker-entrypoint-initdb.d/04-drill-image-enhance.sql:ro
+      - ./sql/mysql/drill_app_collection.sql:/docker-entrypoint-initdb.d/05-drill-app-collection.sql:ro
+      - ./sql/mysql/oauth2_client_logo_migration.sql:/docker-entrypoint-initdb.d/06-oauth2-client-logo.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      # 不只检查 MySQL 进程，还检查各初始化脚本的代表表，避免空库被判为 healthy。
+      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD -Dcnpc_drill -e \"SELECT 1 FROM system_users LIMIT 0; SELECT 1 FROM QRTZ_TRIGGERS LIMIT 0; SELECT 1 FROM drill_image_batch LIMIT 0; SELECT 1 FROM drill_enhance_profile LIMIT 0; SELECT 1 FROM drill_collection_task LIMIT 0;\" >/dev/null 2>&1"]
       interval: 5s
       timeout: 5s
       retries: 30
@@ -31,22 +37,43 @@ services:
 
   redis:
     image: redis:6.2-alpine
-    container_name: yudao-mini-redis
+    container_name: cnpc-redis
     restart: unless-stopped
     environment:
       TZ: Asia/Shanghai
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-123456}
     ports:
       # 6379 is already occupied by a native Redis service on this workstation.
       - "16379:6379"
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
-      - yudao_redis_data:/data
+      - ./cnpc_redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 20
 
+  minio:
+    container_name: cnpc-minio
+    image: minio/minio:RELEASE.2025-03-12T18-04-18Z
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - ./cnpc_minio_data:/data
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
-  yudao_mysql_data:
-  yudao_redis_data:
+  cnpc_mysql_data:
+  cnpc_redis_data:
+  cnpc_minio_data:

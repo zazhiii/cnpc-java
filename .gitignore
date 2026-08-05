@@ -50,6 +50,9 @@ rebel.xml
 
 application-my.yaml
 
+# Local Docker middleware secrets
+/script/docker/middleware.env
+
 /yudao-ui-app/unpackage/
 .DS_Store
 **/.DS_Store
