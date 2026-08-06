@@ -7,8 +7,6 @@ import cn.iocoder.yudao.module.drill.controller.admin.image.vo.batch.ImageBatchC
 import cn.iocoder.yudao.module.drill.controller.admin.image.vo.batch.ImageBatchPageReqVO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.image.ImageAssetDO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.image.ImageBatchDO;
-import cn.iocoder.yudao.module.drill.dal.mysql.enhance.EnhanceJobMapper;
-import cn.iocoder.yudao.module.drill.dal.mysql.enhance.ImageVersionMapper;
 import cn.iocoder.yudao.module.drill.dal.mysql.image.ImageAssetMapper;
 import cn.iocoder.yudao.module.drill.dal.mysql.image.ImageBatchMapper;
 import cn.iocoder.yudao.module.drill.dal.mysql.image.ImageImportRecordMapper;
@@ -20,11 +18,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Set;
+import java.util.Collection;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
-import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.IMAGE_BATCH_HAS_ENHANCE_JOBS;
+import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.IMAGE_BATCH_EMPTY;
 import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.IMAGE_BATCH_NOT_EXISTS;
+import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.IMAGE_BATCH_NOT_READY;
+import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.IMAGE_BATCH_REFERENCED;
 import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.IMAGE_BATCH_STATUS_INVALID;
 import static cn.iocoder.yudao.module.drill.enums.ImageImportConstants.*;
 
@@ -32,10 +32,6 @@ import static cn.iocoder.yudao.module.drill.enums.ImageImportConstants.*;
 public class ImageBatchServiceImpl implements ImageBatchService {
 
     private static final DateTimeFormatter BATCH_NO_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
-    private static final Set<String> IMPORTABLE_STATUSES = Set.of(
-            BATCH_STATUS_IMPORTING, BATCH_STATUS_PENDING_METADATA, BATCH_STATUS_PENDING_PROCESS,
-            BATCH_STATUS_PARTIAL_SUCCESS);
-
     @Resource
     private ImageBatchMapper imageBatchMapper;
     @Resource
@@ -43,9 +39,7 @@ public class ImageBatchServiceImpl implements ImageBatchService {
     @Resource
     private ImageImportRecordMapper imageImportRecordMapper;
     @Resource
-    private EnhanceJobMapper enhanceJobMapper;
-    @Resource
-    private ImageVersionMapper imageVersionMapper;
+    private ImageAssetReferenceService imageAssetReferenceService;
     @Resource
     private FileService fileService;
 
@@ -55,7 +49,7 @@ public class ImageBatchServiceImpl implements ImageBatchService {
         batch.setBatchNo("IMG-" + LocalDateTime.now().format(BATCH_NO_FORMATTER)
                 + "-" + RandomUtil.randomNumbers(4));
         batch.setSourceType(SOURCE_LOCAL_UPLOAD);
-        batch.setStatus(BATCH_STATUS_IMPORTING);
+        batch.setStatus(BATCH_STATUS_IMPORTING); // 状态：导入中
         batch.setTotalCount(0);
         batch.setSuccessCount(0);
         batch.setFailedCount(0);
@@ -80,25 +74,48 @@ public class ImageBatchServiceImpl implements ImageBatchService {
     }
 
     @Override
+    public List<ImageBatchDO> getBatches(Collection<Long> ids) {
+        return ids == null || ids.isEmpty() ? List.of() : imageBatchMapper.selectByIds(ids);
+    }
+
+    @Override
     public ImageBatchDO validateBatchForImport(Long id) {
         ImageBatchDO batch = getBatch(id);
-        if (!IMPORTABLE_STATUSES.contains(batch.getStatus())) {
+        if (!BATCH_STATUS_IMPORTING.equals(batch.getStatus())) {
             throw exception(IMAGE_BATCH_STATUS_INVALID);
         }
         return batch;
     }
 
     @Override
+    public ImageBatchDO validateBatchReady(Long id) {
+        ImageBatchDO batch = getBatch(id);
+        if (!BATCH_STATUS_READY.equals(batch.getStatus())
+                && !BATCH_STATUS_PARTIAL_READY.equals(batch.getStatus())) {
+            throw exception(IMAGE_BATCH_NOT_READY);
+        }
+        return batch;
+    }
+
+    @Override
+    public void finishImport(Long id) {
+        ImageBatchDO batch = validateBatchForImport(id);
+        if (batch.getTotalCount() == null || batch.getTotalCount() == 0) {
+            throw exception(IMAGE_BATCH_EMPTY);
+        }
+        if (imageBatchMapper.finishImport(id) == 0) {
+            throw exception(IMAGE_BATCH_STATUS_INVALID);
+        }
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteBatch(Long id) throws Exception {
         getBatch(id);
-        if (enhanceJobMapper.selectCountByBatchId(id) > 0) {
-            throw exception(IMAGE_BATCH_HAS_ENHANCE_JOBS);
-        }
         List<ImageAssetDO> assets = imageAssetMapper.selectByBatchId(id);
-        if (imageVersionMapper.selectCountByAssetIds(
-                assets.stream().map(ImageAssetDO::getId).toList()) > 0) {
-            throw exception(IMAGE_BATCH_HAS_ENHANCE_JOBS);
+        if (imageAssetReferenceService.hasReferences(
+                assets.stream().map(ImageAssetDO::getId).toList())) {
+            throw exception(IMAGE_BATCH_REFERENCED);
         }
         List<Long> fileIds = assets.stream()
                 .map(ImageAssetDO::getOriginalFileId)

@@ -1,9 +1,12 @@
 package cn.iocoder.yudao.module.drill.service.image;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.module.drill.controller.admin.image.vo.asset.*;
+import cn.iocoder.yudao.module.drill.controller.admin.image.vo.asset.ImageAssetPageReqVO;
+import cn.iocoder.yudao.module.drill.controller.admin.image.vo.asset.ImageAssetUpdateMetadataReqVO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.image.ImageAssetDO;
-import cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.FilePresignedUrlRespVO;
+
+import java.util.Collection;
+import java.util.List;
 
 public interface ImageAssetService {
 
@@ -11,11 +14,15 @@ public interface ImageAssetService {
 
     ImageAssetDO getAsset(Long id);
 
-    ImageImportRespVO uploadAndImport(ImageAssetUploadReqVO uploadReqVO);
+    ImageAssetDO getAssetForUpdate(Long id);
 
-    FilePresignedUrlRespVO createPresignedUpload(ImagePresignedUploadReqVO reqVO);
+    List<ImageAssetDO> getAssets(Collection<Long> ids);
 
-    ImageImportRespVO completeImport(ImageImportCompleteReqVO reqVO);
+    List<ImageAssetDO> getAssetsByBatchId(Long batchId);
+
+    byte[] getAssetContent(Long id);
+
+    void validateAssetsAvailable(Collection<Long> ids);
 
     void updateAssetMetadata(ImageAssetUpdateMetadataReqVO updateReqVO);
 

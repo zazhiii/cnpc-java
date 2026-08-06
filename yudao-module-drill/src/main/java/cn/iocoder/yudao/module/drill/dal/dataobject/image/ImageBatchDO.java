@@ -3,8 +3,9 @@ package cn.iocoder.yudao.module.drill.dal.dataobject.image;
 import cn.iocoder.yudao.framework.tenant.core.db.TenantBaseDO;
 import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableName;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.*;
+
+import java.time.LocalDateTime;
 
 /**
  * 钻头图片导入批次 DO。
@@ -13,8 +14,10 @@ import lombok.EqualsAndHashCode;
 @KeySequence("drill_image_batch_seq")
 @Data
 @EqualsAndHashCode(callSuper = true)
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class ImageBatchDO extends TenantBaseDO {
-
     private Long id;
     private String batchNo;
     private String name;
@@ -27,6 +30,6 @@ public class ImageBatchDO extends TenantBaseDO {
     private Integer failedCount;
     private Integer duplicateCount;
     private Integer pendingMetadataCount;
+    private LocalDateTime finishedTime;
     private String remark;
-
 }

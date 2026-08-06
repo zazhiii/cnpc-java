@@ -52,6 +52,15 @@ public class ImageBatchController {
         return success(BeanUtils.toBean(imageBatchService.getBatch(id), ImageBatchRespVO.class));
     }
 
+    @PostMapping("/finish-import")
+    @Operation(summary = "完成图片导入并封存批次",
+            description = "封存后禁止继续上传，增强和质检只能消费已封存批次。")
+    @PreAuthorize("@ss.hasPermission('drill:image-batch:import')")
+    public CommonResult<Boolean> finishImport(@RequestParam("id") Long id) {
+        imageBatchService.finishImport(id);
+        return success(true);
+    }
+
     @DeleteMapping("/delete")
     @Operation(summary = "删除图片导入批次及关联图片")
     @Parameter(name = "id", description = "批次编号", required = true)

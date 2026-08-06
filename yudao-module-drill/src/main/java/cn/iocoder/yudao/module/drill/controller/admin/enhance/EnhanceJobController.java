@@ -10,9 +10,9 @@ import cn.iocoder.yudao.module.drill.dal.dataobject.image.ImageAssetDO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.image.ImageBatchDO;
 import cn.iocoder.yudao.module.drill.dal.mysql.enhance.EnhanceItemMapper;
 import cn.iocoder.yudao.module.drill.dal.mysql.enhance.EnhanceProfileMapper;
-import cn.iocoder.yudao.module.drill.dal.mysql.image.ImageAssetMapper;
-import cn.iocoder.yudao.module.drill.dal.mysql.image.ImageBatchMapper;
 import cn.iocoder.yudao.module.drill.service.enhance.EnhanceJobService;
+import cn.iocoder.yudao.module.drill.service.image.ImageAssetService;
+import cn.iocoder.yudao.module.drill.service.image.ImageBatchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -40,8 +40,8 @@ public class EnhanceJobController {
     @Resource private EnhanceJobService enhanceJobService;
     @Resource private EnhanceProfileMapper profileMapper;
     @Resource private EnhanceItemMapper itemMapper;
-    @Resource private ImageAssetMapper assetMapper;
-    @Resource private ImageBatchMapper batchMapper;
+    @Resource private ImageAssetService imageAssetService;
+    @Resource private ImageBatchService imageBatchService;
 
     /**
      * 创建图像增强任务。
@@ -76,7 +76,7 @@ public class EnhanceJobController {
                 : profileMapper.selectByIds(profileIds).stream()
                         .collect(Collectors.toMap(EnhanceProfileDO::getId, Function.identity()));
         Map<Long, ImageBatchDO> batches = batchIds.isEmpty() ? Map.of()
-                : batchMapper.selectByIds(batchIds).stream()
+                : imageBatchService.getBatches(batchIds).stream()
                         .collect(Collectors.toMap(ImageBatchDO::getId, Function.identity()));
         List<EnhanceJobVO.Resp> list = page.getList().stream()
                 .map(job -> convertJob(job,
@@ -90,7 +90,7 @@ public class EnhanceJobController {
     public CommonResult<EnhanceJobVO.Resp> get(@RequestParam Long id) {
         EnhanceJobDO job = enhanceJobService.get(id);
         return success(convertJob(job, profileMapper.selectById(job.getProfileId()),
-                job.getBatchId() == null ? null : batchMapper.selectById(job.getBatchId())));
+                job.getBatchId() == null ? null : imageBatchService.getBatch(job.getBatchId())));
     }
     @GetMapping("/item/list")
     @PreAuthorize("@ss.hasPermission('drill:enhance-job:query')")
@@ -99,7 +99,7 @@ public class EnhanceJobController {
         Set<Long> assetIds = items.stream().map(EnhanceItemDO::getAssetId)
                 .filter(Objects::nonNull).collect(Collectors.toSet());
         Map<Long, ImageAssetDO> assets = assetIds.isEmpty() ? Map.of()
-                : assetMapper.selectByIds(assetIds).stream()
+                : imageAssetService.getAssets(assetIds).stream()
                         .collect(Collectors.toMap(ImageAssetDO::getId, Function.identity()));
         return success(items.stream().map(item -> {
             EnhanceJobVO.ItemResp resp = BeanUtils.toBean(item, EnhanceJobVO.ItemResp.class);

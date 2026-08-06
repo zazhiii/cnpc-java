@@ -21,6 +21,7 @@ public class ImageBatchRespVO {
     private Integer failedCount;
     private Integer duplicateCount;
     private Integer pendingMetadataCount;
+    private LocalDateTime finishedTime;
     private String remark;
     private String creator;
     private LocalDateTime createTime;

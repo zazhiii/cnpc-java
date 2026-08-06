@@ -32,13 +32,8 @@ public interface ImageBatchMapper extends BaseMapperX<ImageBatchDO> {
                 failed_count = failed_count + #{failed},
                 duplicate_count = duplicate_count + #{duplicate},
                 pending_metadata_count = pending_metadata_count + #{pendingMetadata},
-                status = CASE
-                    WHEN pending_metadata_count + #{pendingMetadata} > 0 THEN 'PENDING_METADATA'
-                    WHEN failed_count + #{failed} > 0 THEN 'PARTIAL_SUCCESS'
-                    ELSE 'PENDING_PROCESS'
-                END,
                 update_time = CURRENT_TIMESTAMP
-            WHERE id = #{id} AND deleted = 0
+            WHERE id = #{id} AND status = 'IMPORTING' AND deleted = 0
             """)
     int updateImportStatistics(@Param("id") Long id,
                                @Param("total") int total,
@@ -58,16 +53,26 @@ public interface ImageBatchMapper extends BaseMapperX<ImageBatchDO> {
                 GROUP BY batch_id
             ) asset_stats ON asset_stats.batch_id = b.id
             SET b.pending_metadata_count = COALESCE(asset_stats.pending_count, 0),
-                b.status = CASE
-                    WHEN b.status IN ('PROCESSING', 'COMPLETED') THEN b.status
-                    WHEN COALESCE(asset_stats.pending_count, 0) > 0 THEN 'PENDING_METADATA'
-                    WHEN b.failed_count > 0 THEN 'PARTIAL_SUCCESS'
-                    ELSE 'PENDING_PROCESS'
-                END,
                 b.update_time = CURRENT_TIMESTAMP
             WHERE b.id = #{id}
               AND b.deleted = 0
             """)
     int refreshMetadataStatistics(@Param("id") Long id);
+
+    @Update("""
+            UPDATE drill_image_batch
+            SET status = CASE
+                    WHEN success_count > 0 AND failed_count > 0 THEN 'PARTIAL_READY'
+                    WHEN success_count > 0 THEN 'READY'
+                    ELSE 'FAILED'
+                END,
+                finished_time = CURRENT_TIMESTAMP,
+                update_time = CURRENT_TIMESTAMP
+            WHERE id = #{id}
+              AND status = 'IMPORTING'
+              AND total_count > 0
+              AND deleted = 0
+            """)
+    int finishImport(@Param("id") Long id);
 
 }

@@ -31,7 +31,6 @@ public class ImageAssetRespVO {
     private String sha256;
     private LocalDateTime captureTime;
     private String metadataStatus;
-    private String enhanceStatus;
     private String archiveStatus;
     private String remark;
     private LocalDateTime createTime;

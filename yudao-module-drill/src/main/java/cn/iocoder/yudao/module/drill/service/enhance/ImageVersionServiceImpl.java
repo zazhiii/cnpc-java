@@ -10,7 +10,8 @@ import cn.iocoder.yudao.module.drill.dal.mysql.enhance.EnhanceItemMapper;
 import cn.iocoder.yudao.module.drill.dal.mysql.enhance.ImageReviewMapper;
 import cn.iocoder.yudao.module.drill.dal.mysql.enhance.ImageVersionMapper;
 import cn.iocoder.yudao.module.drill.dal.mysql.enhance.ImageVersionPurposeMapper;
-import cn.iocoder.yudao.module.drill.dal.mysql.image.ImageAssetMapper;
+import cn.iocoder.yudao.module.drill.service.image.ImageAssetReferenceService;
+import cn.iocoder.yudao.module.drill.service.image.ImageAssetService;
 import cn.iocoder.yudao.module.infra.service.file.FileService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionU
 import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
 import static cn.iocoder.yudao.module.drill.enums.EnhanceConstants.*;
 import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.*;
+import static cn.iocoder.yudao.module.drill.enums.ImageImportConstants.REFERENCE_BIZ_ENHANCE_VERSION;
 
 @Service
 public class ImageVersionServiceImpl implements ImageVersionService {
@@ -31,7 +33,8 @@ public class ImageVersionServiceImpl implements ImageVersionService {
     @Resource private ImageVersionPurposeMapper purposeMapper;
     @Resource private EnhanceItemMapper itemMapper;
     @Resource private FileService fileService;
-    @Resource private ImageAssetMapper assetMapper;
+    @Resource private ImageAssetService imageAssetService;
+    @Resource private ImageAssetReferenceService imageAssetReferenceService;
     @Resource private EnhanceJobService jobService;
 
     @Override
@@ -71,10 +74,6 @@ public class ImageVersionServiceImpl implements ImageVersionService {
             itemUpdate.setId(item.getId());
             itemUpdate.setStatus(ITEM_REVIEW_PASSED);
             itemMapper.updateById(itemUpdate);
-            ImageAssetDO assetUpdate = new ImageAssetDO();
-            assetUpdate.setId(version.getAssetId());
-            assetUpdate.setEnhanceStatus(ITEM_REVIEW_PASSED);
-            assetMapper.updateById(assetUpdate);
             jobService.refreshJob(item.getJobId());
         }
     }
@@ -87,8 +86,7 @@ public class ImageVersionServiceImpl implements ImageVersionService {
                 || !Set.of(PUBLISH_UNPUBLISHED, PUBLISH_WITHDRAWN).contains(version.getPublishStatus())) {
             throw exception(IMAGE_VERSION_STATE_INVALID);
         }
-        assetMapper.selectOneForUpdate(cn.iocoder.yudao.module.drill.dal.dataobject.image.ImageAssetDO::getId,
-                version.getAssetId());
+        imageAssetService.getAssetForUpdate(version.getAssetId());
         for (String purpose : req.getPurposes().stream().distinct().toList()) {
             if (Boolean.TRUE.equals(req.getSetAsDefault())) purposeMapper.clearDefault(version.getAssetId(), purpose);
             ImageVersionPurposeDO relation = purposeMapper.selectByVersionAndPurpose(id, purpose);
@@ -103,19 +101,12 @@ public class ImageVersionServiceImpl implements ImageVersionService {
         update.setPurpose(String.join(",", req.getPurposes().stream().distinct().toList()));
         update.setDefaultVersion(Boolean.TRUE.equals(req.getSetAsDefault())); update.setWithdrawReason(null);
         versionMapper.updateById(update);
-        ImageAssetDO assetUpdate = new ImageAssetDO();
-        assetUpdate.setId(version.getAssetId());
-        assetUpdate.setEnhanceStatus(PUBLISH_PUBLISHED);
-        assetMapper.updateById(assetUpdate);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void publishOriginal(Long assetId, ImageVersionVO.PublishReq req) {
-        ImageAssetDO asset = assetMapper.selectOneForUpdate(ImageAssetDO::getId, assetId);
-        if (asset == null) {
-            throw exception(IMAGE_ASSET_NOT_EXISTS);
-        }
+        ImageAssetDO asset = imageAssetService.getAssetForUpdate(assetId);
         ImageVersionDO version = versionMapper.selectOriginalByAssetId(assetId);
         if (version == null) {
             version = new ImageVersionDO();
@@ -142,6 +133,7 @@ public class ImageVersionServiceImpl implements ImageVersionService {
             version.setDefaultVersion(false);
             versionMapper.insert(version);
         }
+        imageAssetReferenceService.bindAssets(Set.of(assetId), REFERENCE_BIZ_ENHANCE_VERSION, version.getId());
         publish(version.getId(), req);
     }
 
@@ -155,10 +147,6 @@ public class ImageVersionServiceImpl implements ImageVersionService {
         update.setWithdrawReason(req.getReason());
         versionMapper.updateById(update);
         purposeMapper.withdrawByVersionId(id);
-        ImageAssetDO assetUpdate = new ImageAssetDO();
-        assetUpdate.setId(version.getAssetId());
-        assetUpdate.setEnhanceStatus(PUBLISH_WITHDRAWN);
-        assetMapper.updateById(assetUpdate);
     }
 
     @Override

@@ -8,12 +8,13 @@ CREATE TABLE IF NOT EXISTS `drill_image_batch` (
   `source_type` varchar(32) NOT NULL COMMENT '来源类型：LOCAL_UPLOAD、PRESIGNED_UPLOAD、MINIO_OBJECT 等',
   `project_id` bigint DEFAULT NULL COMMENT '项目编号',
   `scene_type` varchar(32) DEFAULT NULL COMMENT '场景：IN_HOLE、OUT_HOLE、HISTORY、OTHER',
-  `status` varchar(32) NOT NULL COMMENT '批次状态',
+  `status` varchar(32) NOT NULL COMMENT '导入状态：IMPORTING、READY、PARTIAL_READY、FAILED、ARCHIVED',
   `total_count` int NOT NULL DEFAULT 0 COMMENT '文件总数',
   `success_count` int NOT NULL DEFAULT 0 COMMENT '成功导入数',
   `failed_count` int NOT NULL DEFAULT 0 COMMENT '导入失败数',
   `duplicate_count` int NOT NULL DEFAULT 0 COMMENT '重复文件数',
   `pending_metadata_count` int NOT NULL DEFAULT 0 COMMENT '待补录元数据数',
+  `finished_time` datetime DEFAULT NULL COMMENT '导入封存时间',
   `remark` varchar(500) DEFAULT NULL COMMENT '备注',
   `tenant_id` bigint NOT NULL DEFAULT 0 COMMENT '租户编号',
   `creator` varchar(64) DEFAULT '' COMMENT '创建者',
@@ -51,7 +52,6 @@ CREATE TABLE IF NOT EXISTS `drill_image_asset` (
   `sha256` char(64) NOT NULL COMMENT '原始文件 SHA-256',
   `capture_time` datetime DEFAULT NULL COMMENT '拍摄时间',
   `metadata_status` varchar(24) NOT NULL COMMENT '元数据状态：COMPLETE、PENDING',
-  `enhance_status` varchar(32) DEFAULT NULL COMMENT '增强状态',
   `archive_status` varchar(24) NOT NULL DEFAULT 'ACTIVE' COMMENT '归档状态',
   `remark` varchar(500) DEFAULT NULL COMMENT '备注',
   `tenant_id` bigint NOT NULL DEFAULT 0 COMMENT '租户编号',
@@ -93,6 +93,22 @@ CREATE TABLE IF NOT EXISTS `drill_image_import_record` (
   KEY `idx_import_sha256` (`tenant_id`, `sha256`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='钻头图片导入明细记录';
 
+CREATE TABLE IF NOT EXISTS `drill_image_asset_reference` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '引用编号',
+  `asset_id` bigint NOT NULL COMMENT '图片资产编号',
+  `biz_type` varchar(64) NOT NULL COMMENT '业务类型',
+  `biz_id` bigint NOT NULL COMMENT '业务编号',
+  `tenant_id` bigint NOT NULL DEFAULT 0 COMMENT '租户编号',
+  `creator` varchar(64) DEFAULT '' COMMENT '创建者',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updater` varchar(64) DEFAULT '' COMMENT '更新者',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_asset_business` (`tenant_id`, `asset_id`, `biz_type`, `biz_id`, `deleted`),
+  KEY `idx_reference_business` (`tenant_id`, `biz_type`, `biz_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='图片资产业务引用';
+
 -- 修复历史数据：图片元数据已经补录，但批次待补录数量和状态尚未同步
 UPDATE `drill_image_batch` b
 LEFT JOIN (
@@ -104,10 +120,11 @@ LEFT JOIN (
 ) asset_stats ON asset_stats.`batch_id` = b.`id`
 SET b.`pending_metadata_count` = COALESCE(asset_stats.`pending_count`, 0),
     b.`status` = CASE
-      WHEN b.`status` IN ('PROCESSING', 'COMPLETED') THEN b.`status`
-      WHEN COALESCE(asset_stats.`pending_count`, 0) > 0 THEN 'PENDING_METADATA'
-      WHEN b.`failed_count` > 0 THEN 'PARTIAL_SUCCESS'
-      ELSE 'PENDING_PROCESS'
+      WHEN b.`status` = 'IMPORTING' THEN 'IMPORTING'
+      WHEN b.`success_count` > 0 AND b.`failed_count` > 0 THEN 'PARTIAL_READY'
+      WHEN b.`success_count` > 0 THEN 'READY'
+      ELSE 'FAILED'
     END,
+    b.`finished_time` = CASE WHEN b.`status` = 'IMPORTING' THEN NULL ELSE COALESCE(b.`finished_time`, CURRENT_TIMESTAMP) END,
     b.`update_time` = CURRENT_TIMESTAMP
 WHERE b.`deleted` = b'0';

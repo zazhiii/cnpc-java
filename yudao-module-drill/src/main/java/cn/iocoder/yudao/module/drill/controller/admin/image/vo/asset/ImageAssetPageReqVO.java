@@ -17,6 +17,4 @@ public class ImageAssetPageReqVO extends PageParam {
     private String photoType;
     private String bladeNo;
     private String metadataStatus;
-    private String enhanceStatus;
-
 }

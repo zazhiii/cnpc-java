@@ -7,7 +7,7 @@ import cn.iocoder.yudao.module.drill.controller.admin.enhance.vo.ImageVersionVO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.enhance.*;
 import cn.iocoder.yudao.module.drill.dal.dataobject.image.ImageAssetDO;
 import cn.iocoder.yudao.module.drill.dal.mysql.enhance.*;
-import cn.iocoder.yudao.module.drill.dal.mysql.image.ImageAssetMapper;
+import cn.iocoder.yudao.module.drill.service.image.ImageAssetService;
 import cn.iocoder.yudao.module.drill.service.enhance.model.EnhanceModels.*;
 import cn.iocoder.yudao.module.drill.service.enhance.pipeline.ManualRequiredException;
 import cn.iocoder.yudao.module.drill.service.enhance.pipeline.OpenCvEnhancePipeline;
@@ -35,7 +35,7 @@ public class EnhanceTaskWorker {
     @Resource private EnhanceProfileMapper profileMapper;
     @Resource private EnhanceStepLogMapper stepLogMapper;
     @Resource private ImageVersionMapper versionMapper;
-    @Resource private ImageAssetMapper assetMapper;
+    @Resource private ImageAssetService imageAssetService;
     @Resource private FileService fileService;
     @Resource private OpenCvEnhancePipeline pipeline;
     @Resource private EnhanceJobService jobService;
@@ -91,8 +91,8 @@ public class EnhanceTaskWorker {
         try {
             EnhanceJobDO job = enhanceJobMapper.selectById(item.getJobId());
             EnhanceProfileDO profile = profileMapper.selectById(job.getProfileId());
-            ImageAssetDO asset = assetMapper.selectById(item.getAssetId());
-            byte[] input = fileService.getFileContent(asset.getFileConfigId(), asset.getObjectKey());
+            ImageAssetDO asset = imageAssetService.getAsset(item.getAssetId());
+            byte[] input = imageAssetService.getAssetContent(asset.getId());
             List<StepConfig> steps = JsonUtils.parseArray(profile.getPipelineJson(), StepConfig.class);
             OutputSpec output = JsonUtils.parseObject(profile.getOutputSpecJson(), OutputSpec.class);
             ManualOverrides manual = JsonUtils.parseObject(item.getManualOverridesJson(), ManualOverrides.class);
@@ -117,7 +117,7 @@ public class EnhanceTaskWorker {
     private Long persistResult(EnhanceItemDO item, EnhanceJobDO job, EnhanceProfileDO profile, ImageAssetDO original,
                                List<StepConfig> steps, PipelineResult result) {
         return transactionTemplate.execute(status -> {
-            ImageAssetDO asset = assetMapper.selectOneForUpdate(ImageAssetDO::getId, original.getId());
+            ImageAssetDO asset = imageAssetService.getAssetForUpdate(original.getId());
             int versionNo = versionMapper.selectNextVersionNo(asset.getId());
             String directory = "drill-images/tenant-" + asset.getTenantId() + "/asset-" + asset.getId()
                     + "/versions/v" + versionNo;
@@ -159,9 +159,6 @@ public class EnhanceTaskWorker {
                 done.setProgress(100); done.setFinishedAt(LocalDateTime.now());
                 done.setDurationMs(java.time.Duration.between(item.getStartedAt(), LocalDateTime.now()).toMillis());
                 done.setWorkerId(null); done.setLeaseUntil(null); itemMapper.updateById(done);
-                ImageAssetDO assetUpdate = new ImageAssetDO();
-                assetUpdate.setId(asset.getId()); assetUpdate.setEnhanceStatus(done.getStatus());
-                assetMapper.updateById(assetUpdate);
                 return version.getId();
             } catch (Exception ex) {
                 if (fileId != null) try { fileService.deleteFile(fileId); } catch (Exception cleanup) {
@@ -178,8 +175,6 @@ public class EnhanceTaskWorker {
         update.setErrorMessage(message); update.setFinishedAt(LocalDateTime.now());
         update.setDurationMs(System.currentTimeMillis() - started); update.setWorkerId(null); update.setLeaseUntil(null);
         itemMapper.updateById(update);
-        ImageAssetDO asset = new ImageAssetDO();
-        asset.setId(item.getAssetId()); asset.setEnhanceStatus(status); assetMapper.updateById(asset);
     }
 
     private void resetPending(Long itemId) {

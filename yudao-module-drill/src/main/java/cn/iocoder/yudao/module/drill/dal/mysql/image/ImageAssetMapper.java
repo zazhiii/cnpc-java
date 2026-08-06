@@ -21,7 +21,6 @@ public interface ImageAssetMapper extends BaseMapperX<ImageAssetDO> {
                 .eqIfPresent(ImageAssetDO::getPhotoType, reqVO.getPhotoType())
                 .eqIfPresent(ImageAssetDO::getBladeNo, reqVO.getBladeNo())
                 .eqIfPresent(ImageAssetDO::getMetadataStatus, reqVO.getMetadataStatus())
-                .eqIfPresent(ImageAssetDO::getEnhanceStatus, reqVO.getEnhanceStatus())
                 .and(reqVO.getKeyword() != null, wrapper -> wrapper
                         .like(ImageAssetDO::getAssetNo, reqVO.getKeyword())
                         .or()

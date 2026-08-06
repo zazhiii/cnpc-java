@@ -6,8 +6,15 @@ package cn.iocoder.yudao.module.drill.enums;
 public interface ImageImportConstants {
 
     String BATCH_STATUS_IMPORTING = "IMPORTING";
+    String BATCH_STATUS_READY = "READY";
+    String BATCH_STATUS_PARTIAL_READY = "PARTIAL_READY";
+    String BATCH_STATUS_FAILED = "FAILED";
+    String BATCH_STATUS_ARCHIVED = "ARCHIVED";
+    /** 旧状态，仅用于迁移已有数据。 */
     String BATCH_STATUS_PENDING_METADATA = "PENDING_METADATA";
+    /** 旧状态，仅用于迁移已有数据。 */
     String BATCH_STATUS_PENDING_PROCESS = "PENDING_PROCESS";
+    /** 旧状态，仅用于迁移已有数据。 */
     String BATCH_STATUS_PARTIAL_SUCCESS = "PARTIAL_SUCCESS";
     String METADATA_STATUS_COMPLETE = "COMPLETE";
     String METADATA_STATUS_PENDING = "PENDING";
@@ -18,5 +25,8 @@ public interface ImageImportConstants {
 
     String SOURCE_LOCAL_UPLOAD = "LOCAL_UPLOAD";
     String SOURCE_PRESIGNED_UPLOAD = "PRESIGNED_UPLOAD";
+
+    String REFERENCE_BIZ_ENHANCE_JOB = "ENHANCE_JOB";
+    String REFERENCE_BIZ_ENHANCE_VERSION = "ENHANCE_VERSION";
 
 }

@@ -6,6 +6,8 @@ import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.drill.controller.admin.image.vo.asset.*;
 import cn.iocoder.yudao.module.drill.dal.dataobject.image.ImageAssetDO;
 import cn.iocoder.yudao.module.drill.service.image.ImageAssetService;
+import cn.iocoder.yudao.module.drill.service.image.ImageBatchService;
+import cn.iocoder.yudao.module.drill.service.image.ImageImportService;
 import cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.FilePresignedUrlRespVO;
 import cn.iocoder.yudao.module.infra.service.file.FileService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,33 +33,42 @@ public class ImageAssetController {
     @Resource
     private ImageAssetService imageAssetService;
     @Resource
+    private ImageImportService imageImportService;
+    @Resource
+    private ImageBatchService imageBatchService;
+    @Resource
     private FileService fileService;
 
+    /** 旧客户端兼容入口；新客户端使用 /drill/image-import/upload 后显式封存批次。 */
+    @Deprecated
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "直接上传并导入图片",
-            description = "适合小批量图片。允许部分成功，响应包含每个文件的处理结果。")
+    @Operation(summary = "直接上传并导入图片（兼容接口）")
     @PreAuthorize("@ss.hasPermission('drill:image-batch:import')")
     public CommonResult<ImageImportRespVO> uploadAndImport(
             @Valid @ModelAttribute ImageAssetUploadReqVO uploadReqVO) {
-        return success(imageAssetService.uploadAndImport(uploadReqVO));
+        ImageImportRespVO result = imageImportService.uploadAndImport(uploadReqVO);
+        imageBatchService.finishImport(uploadReqVO.getBatchId());
+        return success(result);
     }
 
+    @Deprecated
     @PostMapping("/presigned-upload")
-    @Operation(summary = "申请图片预签名上传地址",
-            description = "适合大批量图片。浏览器直传对象存储后，再调用 import-complete。")
+    @Operation(summary = "申请图片预签名上传地址（兼容接口）")
     @PreAuthorize("@ss.hasPermission('drill:image-batch:import')")
     public CommonResult<FilePresignedUrlRespVO> createPresignedUpload(
             @Valid @RequestBody ImagePresignedUploadReqVO reqVO) {
-        return success(imageAssetService.createPresignedUpload(reqVO));
+        return success(imageImportService.createPresignedUpload(reqVO));
     }
 
+    @Deprecated
     @PostMapping("/import-complete")
-    @Operation(summary = "确认预签名上传并导入图片",
-            description = "服务端重新读取对象，校验大小、摘要、格式和分辨率后登记图片资产。")
+    @Operation(summary = "确认预签名上传并导入图片（兼容接口）")
     @PreAuthorize("@ss.hasPermission('drill:image-batch:import')")
     public CommonResult<ImageImportRespVO> completeImport(
             @Valid @RequestBody ImageImportCompleteReqVO reqVO) {
-        return success(imageAssetService.completeImport(reqVO));
+        ImageImportRespVO result = imageImportService.completeImport(reqVO);
+        imageBatchService.finishImport(reqVO.getBatchId());
+        return success(result);
     }
 
     @GetMapping("/page")

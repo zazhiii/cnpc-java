@@ -40,7 +40,6 @@ public class ImageAssetDO extends TenantBaseDO {
     private String sha256;
     private LocalDateTime captureTime;
     private String metadataStatus;
-    private String enhanceStatus;
     private String archiveStatus;
     private String remark;
 

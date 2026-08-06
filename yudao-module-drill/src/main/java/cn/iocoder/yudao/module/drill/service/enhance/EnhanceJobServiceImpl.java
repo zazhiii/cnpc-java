@@ -15,7 +15,9 @@ import cn.iocoder.yudao.module.drill.dal.dataobject.image.ImageAssetDO;
 import cn.iocoder.yudao.module.drill.dal.mysql.enhance.EnhanceItemMapper;
 import cn.iocoder.yudao.module.drill.dal.mysql.enhance.EnhanceJobMapper;
 import cn.iocoder.yudao.module.drill.dal.mysql.enhance.EnhanceStepLogMapper;
-import cn.iocoder.yudao.module.drill.dal.mysql.image.ImageAssetMapper;
+import cn.iocoder.yudao.module.drill.service.image.ImageAssetReferenceService;
+import cn.iocoder.yudao.module.drill.service.image.ImageAssetService;
+import cn.iocoder.yudao.module.drill.service.image.ImageBatchService;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -25,7 +27,6 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -53,7 +54,7 @@ import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.ENHANCE_JOB
 import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.ENHANCE_JOB_STATE_INVALID;
 import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.ENHANCE_PROFILE_INVALID;
 import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.ENHANCE_PROFILE_STATE_INVALID;
-import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.IMAGE_ASSET_NOT_EXISTS;
+import static cn.iocoder.yudao.module.drill.enums.ImageImportConstants.REFERENCE_BIZ_ENHANCE_JOB;
 
 /**
  * 图像增强任务 Service 实现。
@@ -104,7 +105,11 @@ public class EnhanceJobServiceImpl implements EnhanceJobService {
     @Resource
     private EnhanceProfileService enhanceProfileService;
     @Resource
-    private ImageAssetMapper imageAssetMapper;
+    private ImageAssetService imageAssetService;
+    @Resource
+    private ImageBatchService imageBatchService;
+    @Resource
+    private ImageAssetReferenceService imageAssetReferenceService;
 
     // ==================== 创建任务 ====================
 
@@ -163,6 +168,7 @@ public class EnhanceJobServiceImpl implements EnhanceJobService {
 
         Long existingJobId = findIdempotentJob(idempotencyKey, requestHash);
         if (existingJobId != null) {
+            imageAssetReferenceService.bindAssets(assetIds, REFERENCE_BIZ_ENHANCE_JOB, existingJobId);
             return existingJobId;
         }
 
@@ -181,6 +187,7 @@ public class EnhanceJobServiceImpl implements EnhanceJobService {
 
         // 主记录入库后才能取得 jobId，并建立任务项与任务的关联。
         enhanceItemMapper.insertBatch(buildJobItems(job.getId(), assetIds));
+        imageAssetReferenceService.bindAssets(assetIds, REFERENCE_BIZ_ENHANCE_JOB, job.getId());
         return job.getId();
     }
 
@@ -206,9 +213,12 @@ public class EnhanceJobServiceImpl implements EnhanceJobService {
             throw exception(ENHANCE_PROFILE_INVALID, "assetIds和batchId必须且只能提供一个");
         }
 
+        if (hasBatchId) {
+            imageBatchService.validateBatchReady(createReqVO.getBatchId());
+        }
         List<Long> assetIds = hasAssetIds
                 ? createReqVO.getAssetIds()
-                : imageAssetMapper.selectByBatchId(createReqVO.getBatchId()).stream()
+                : imageAssetService.getAssetsByBatchId(createReqVO.getBatchId()).stream()
                         .map(ImageAssetDO::getId)
                         .toList();
         validateAssets(assetIds);
@@ -220,11 +230,7 @@ public class EnhanceJobServiceImpl implements EnhanceJobService {
             throw exception(ENHANCE_PROFILE_INVALID, "没有可处理的图片");
         }
 
-        // 使用去重后的请求数量比较查询结果，避免重复 ID 干扰存在性校验。
-        int distinctAssetCount = new HashSet<>(assetIds).size();
-        if (imageAssetMapper.selectByIds(assetIds).size() != distinctAssetCount) {
-            throw exception(IMAGE_ASSET_NOT_EXISTS);
-        }
+        imageAssetService.validateAssetsAvailable(assetIds);
     }
 
     /**
