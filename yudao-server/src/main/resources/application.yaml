@@ -370,6 +370,15 @@ debug: false
 
 # 钻头图像增强：默认使用数据库任务队列和本机 CPU。
 drill:
+  e11-quality-gate:
+    # 运行 install.cmd 后会生成该 Python；生产环境建议通过环境变量配置绝对路径。
+    python-executable: ${E11_GATE_PYTHON:../e11_quality_gate_windows_20260804/.venv/Scripts/python.exe}
+    script-path: ${E11_GATE_SCRIPT:../e11_quality_gate_windows_20260804/e11_quality_gate.py}
+    model-path: ${E11_GATE_MODEL:../e11_quality_gate_windows_20260804/e11.onnx}
+    device: ${E11_GATE_DEVICE:cpu}
+    timeout: 2m
+    max-concurrent: 1
+    acquire-timeout: 5s
   image-enhance:
     executor:
       core-size: 2

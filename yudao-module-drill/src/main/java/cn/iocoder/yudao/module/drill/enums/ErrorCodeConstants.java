@@ -48,4 +48,14 @@ public interface ErrorCodeConstants {
     ErrorCode APP_COLLECTION_INCOMPLETE = new ErrorCode(1_050_000_062,
             "必拍照片未完成，当前 {} 张，至少需要 {} 张");
 
+    ErrorCode E11_QUALITY_GATE_UNAVAILABLE = new ErrorCode(1_050_000_070,
+            "E11 图片质量检测服务不可用，请检查模型配置");
+    ErrorCode E11_QUALITY_GATE_TIMEOUT = new ErrorCode(1_050_000_071, "E11 图片质量检测超时（{} ms）");
+    ErrorCode E11_QUALITY_GATE_MODEL_ERROR = new ErrorCode(1_050_000_072, "E11 模型推理失败，请检查服务日志");
+    ErrorCode E11_QUALITY_GATE_ARGUMENT_ERROR = new ErrorCode(1_050_000_073, "E11 模型调用参数错误");
+    ErrorCode E11_QUALITY_GATE_PROCESS_ERROR = new ErrorCode(1_050_000_074, "E11 模型进程异常退出：{}");
+    ErrorCode E11_QUALITY_GATE_INVALID_RESPONSE = new ErrorCode(1_050_000_075, "E11 模型返回了无效结果");
+    ErrorCode E11_QUALITY_GATE_BUSY = new ErrorCode(1_050_000_076, "E11 图片质量检测繁忙，请稍后重试");
+    ErrorCode E11_QUALITY_GATE_INTERRUPTED = new ErrorCode(1_050_000_077, "E11 图片质量检测被中断");
+
 }
