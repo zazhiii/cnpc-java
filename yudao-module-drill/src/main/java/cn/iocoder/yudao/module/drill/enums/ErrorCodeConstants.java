@@ -61,4 +61,16 @@ public interface ErrorCodeConstants {
     ErrorCode E11_QUALITY_GATE_BUSY = new ErrorCode(1_050_000_076, "E11 图片质量检测繁忙，请稍后重试");
     ErrorCode E11_QUALITY_GATE_INTERRUPTED = new ErrorCode(1_050_000_077, "E11 图片质量检测被中断");
 
+    ErrorCode QUALITY_PROFILE_NOT_EXISTS = new ErrorCode(1_050_000_080, "图片质检方案不存在");
+    ErrorCode QUALITY_PROFILE_DUPLICATE = new ErrorCode(1_050_000_081, "图片质检方案编码和版本已存在");
+    ErrorCode QUALITY_PROFILE_STATE_INVALID = new ErrorCode(1_050_000_082, "当前图片质检方案状态不允许该操作");
+    ErrorCode QUALITY_PROFILE_INVALID = new ErrorCode(1_050_000_083, "图片质检方案配置不合法：{}");
+    ErrorCode QUALITY_MODEL_UNSUPPORTED = new ErrorCode(1_050_000_084, "不支持的图片质检模型：{}");
+    ErrorCode QUALITY_DEFAULT_PROFILE_NOT_EXISTS = new ErrorCode(1_050_000_085, "当前租户未配置默认图片质检方案");
+    ErrorCode QUALITY_DEFAULT_PROFILE_PROTECTED = new ErrorCode(1_050_000_086, "默认图片质检方案不能停用或删除");
+    ErrorCode QUALITY_PROFILE_IN_USE = new ErrorCode(1_050_000_087, "图片质检方案已有质检记录，不能删除");
+    ErrorCode QUALITY_CHECK_REQUEST_INVALID = new ErrorCode(1_050_000_088, "图片质检请求不合法：{}");
+    ErrorCode QUALITY_RECORD_NOT_EXISTS = new ErrorCode(1_050_000_089, "图片质检记录不存在");
+    ErrorCode QUALITY_MODEL_EXECUTION_FAILED = new ErrorCode(1_050_000_090, "图片质检模型执行失败");
+
 }

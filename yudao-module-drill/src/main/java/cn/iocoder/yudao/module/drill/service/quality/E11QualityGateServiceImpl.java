@@ -1,12 +1,11 @@
 package cn.iocoder.yudao.module.drill.service.quality;
 
 import cn.iocoder.yudao.module.drill.config.E11QualityGateProperties;
-import cn.iocoder.yudao.module.drill.controller.admin.quality.vo.E11QualityGateRespVO;
-import cn.iocoder.yudao.module.drill.service.image.ImageFileValidator;
+import cn.iocoder.yudao.module.drill.service.quality.model.ImageQualityModelResult;
+import cn.iocoder.yudao.module.drill.service.quality.model.QualityImageInput;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -18,6 +17,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
@@ -36,15 +37,12 @@ public class E11QualityGateServiceImpl implements E11QualityGateService {
     private static final int MAX_ERROR_BYTES = 32 * 1024;
 
     private final E11QualityGateProperties properties;
-    private final ImageFileValidator imageFileValidator;
     private final E11GateReportParser reportParser;
     private final Semaphore concurrencyGuard;
 
     public E11QualityGateServiceImpl(E11QualityGateProperties properties,
-                                     ImageFileValidator imageFileValidator,
                                      ObjectMapper objectMapper) {
         this.properties = properties;
-        this.imageFileValidator = imageFileValidator;
         this.reportParser = new E11GateReportParser(objectMapper);
         int maxConcurrent = properties.getMaxConcurrent() == null ? 1 : properties.getMaxConcurrent();
         if (maxConcurrent < 1) {
@@ -54,9 +52,40 @@ public class E11QualityGateServiceImpl implements E11QualityGateService {
     }
 
     @Override
-    public E11QualityGateRespVO check(MultipartFile file, double confidence, int minDetections) {
+    public String getModelCode() {
+        return "E11";
+    }
+
+    @Override
+    public void validateConfig(Map<String, Object> config) {
+        if (config == null || !config.keySet().equals(Set.of("confidence", "minDetections"))) {
+            throw exception(QUALITY_PROFILE_INVALID, "E11 参数必须且只能包含 confidence、minDetections");
+        }
+        double confidence = number(config.get("confidence"), "confidence").doubleValue();
+        int minDetections = integer(config.get("minDetections"), "minDetections");
+        if (!Double.isFinite(confidence) || confidence < 0D || confidence > 1D) {
+            throw exception(QUALITY_PROFILE_INVALID, "confidence 必须在 [0,1] 范围内");
+        }
+        if (minDetections < 1 || minDetections > 300) {
+            throw exception(QUALITY_PROFILE_INVALID, "minDetections 必须在 [1,300] 范围内");
+        }
+    }
+
+    @Override
+    public void checkAvailability() {
+        requiredFile(properties.getPythonExecutable(), "Python 虚拟环境");
+        requiredFile(properties.getScriptPath(), "模型脚本");
+        requiredFile(properties.getModelPath(), "E11 模型");
+        durationMillis(properties.getTimeout(), Duration.ofMinutes(2));
+        durationMillis(properties.getAcquireTimeout(), Duration.ofSeconds(5));
+    }
+
+    @Override
+    public ImageQualityModelResult execute(QualityImageInput image, Map<String, Object> config) {
+        validateConfig(config);
+        double confidence = number(config.get("confidence"), "confidence").doubleValue();
+        int minDetections = integer(config.get("minDetections"), "minDetections");
         long startedAt = System.nanoTime();
-        ValidatedImage image = readAndValidate(file);
         boolean acquired = false;
         try {
             // 并发控制
@@ -67,7 +96,7 @@ public class E11QualityGateServiceImpl implements E11QualityGateService {
             }
 
             // 执行质检
-            E11QualityGateRespVO result = execute(image, confidence, minDetections);
+            ImageQualityModelResult result = executeProcess(image, confidence, minDetections);
             result.setDurationMs(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt));
             return result;
         } catch (InterruptedException ex) {
@@ -80,21 +109,8 @@ public class E11QualityGateServiceImpl implements E11QualityGateService {
         }
     }
 
-    private ValidatedImage readAndValidate(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw exception(IMAGE_FILE_EMPTY);
-        }
-        try {
-            byte[] content = file.getBytes();
-            ImageFileValidator.ImageInfo imageInfo = imageFileValidator.validate(content, file.getOriginalFilename());
-            return new ValidatedImage(content, extensionForMimeType(imageInfo.getMimeType()));
-        } catch (IOException ex) {
-            throw exception(IMAGE_DECODE_FAILED);
-        }
-    }
-
-    private E11QualityGateRespVO execute(ValidatedImage image, double confidence,
-                                         int minDetections) {
+    private ImageQualityModelResult executeProcess(QualityImageInput image, double confidence,
+                                                   int minDetections) {
         Path python = requiredFile(properties.getPythonExecutable(), "Python 虚拟环境");
         Path script = requiredFile(properties.getScriptPath(), "模型脚本");
         Path model = requiredFile(properties.getModelPath(), "E11 模型");
@@ -102,7 +118,7 @@ public class E11QualityGateServiceImpl implements E11QualityGateService {
         Process process = null;
         try {
             workDirectory = Files.createTempDirectory("e11-quality-gate-");
-            Path input = workDirectory.resolve("input" + image.extension());
+            Path input = workDirectory.resolve("input" + extensionForMimeType(image.mimeType()));
             Path stdout = workDirectory.resolve("stdout.json");
             Path stderr = workDirectory.resolve("stderr.log");
             Files.write(input, image.content());
@@ -189,6 +205,22 @@ public class E11QualityGateServiceImpl implements E11QualityGateService {
         };
     }
 
+    private Number number(Object value, String name) {
+        if (!(value instanceof Number number)) {
+            throw exception(QUALITY_PROFILE_INVALID, name + " 必须是数值");
+        }
+        return number;
+    }
+
+    private int integer(Object value, String name) {
+        Number number = number(value, name);
+        double raw = number.doubleValue();
+        if (!Double.isFinite(raw) || raw != Math.rint(raw)) {
+            throw exception(QUALITY_PROFILE_INVALID, name + " 必须是整数");
+        }
+        return number.intValue();
+    }
+
     private long durationMillis(Duration configured, Duration defaultValue) {
         Duration value = configured == null ? defaultValue : configured;
         if (value.isZero() || value.isNegative()) {
@@ -252,8 +284,4 @@ public class E11QualityGateServiceImpl implements E11QualityGateService {
             log.warn("Unable to clean E11 temporary directory: {}", directory, ex);
         }
     }
-
-    private record ValidatedImage(byte[] content, String extension) {
-    }
-
 }

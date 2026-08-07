@@ -1,6 +1,6 @@
 package cn.iocoder.yudao.module.drill.service.quality;
 
-import cn.iocoder.yudao.module.drill.controller.admin.quality.vo.E11QualityGateRespVO;
+import cn.iocoder.yudao.module.drill.service.quality.model.ImageQualityModelResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -33,7 +33,7 @@ class E11GateReportParserTest {
                 }
                 """;
 
-        E11QualityGateRespVO result = parser.parse(json, 0, 0.75, 1);
+        ImageQualityModelResult result = parser.parse(json, 0, 0.75, 1);
 
         assertTrue(result.getPassed());
         assertEquals(1, result.getAcceptedCount());
@@ -61,7 +61,7 @@ class E11GateReportParserTest {
                 }
                 """;
 
-        E11QualityGateRespVO result = parser.parse(json, 10, 0.8, 1);
+        ImageQualityModelResult result = parser.parse(json, 10, 0.8, 1);
 
         assertFalse(result.getPassed());
         assertEquals(0, result.getAcceptedCount());

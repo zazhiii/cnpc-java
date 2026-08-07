@@ -19,6 +19,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Collection;
+import java.util.Objects;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.IMAGE_BATCH_EMPTY;
@@ -113,13 +114,13 @@ public class ImageBatchServiceImpl implements ImageBatchService {
     public void deleteBatch(Long id) throws Exception {
         getBatch(id);
         List<ImageAssetDO> assets = imageAssetMapper.selectByBatchId(id);
-        if (imageAssetReferenceService.hasReferences(
-                assets.stream().map(ImageAssetDO::getId).toList())) {
-            throw exception(IMAGE_BATCH_REFERENCED);
-        }
+//        if (imageAssetReferenceService.hasReferences(
+//                assets.stream().map(ImageAssetDO::getId).toList())) {
+//            throw exception(IMAGE_BATCH_REFERENCED);
+//        }
         List<Long> fileIds = assets.stream()
                 .map(ImageAssetDO::getOriginalFileId)
-                .filter(fileId -> fileId != null)
+                .filter(Objects::nonNull)
                 .distinct()
                 .toList();
         if (!fileIds.isEmpty()) {

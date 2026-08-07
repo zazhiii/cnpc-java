@@ -1,6 +1,6 @@
 package cn.iocoder.yudao.module.drill.service.quality;
 
-import cn.iocoder.yudao.module.drill.controller.admin.quality.vo.E11QualityGateRespVO;
+import cn.iocoder.yudao.module.drill.service.quality.model.ImageQualityModelResult;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -21,14 +21,14 @@ final class E11GateReportParser {
         this.objectMapper = objectMapper;
     }
 
-    E11QualityGateRespVO parse(String json, int exitCode, double requestedConfidence,
+    ImageQualityModelResult parse(String json, int exitCode, double requestedConfidence,
                                int requestedMinDetections) {
         try {
             JsonNode root = objectMapper.readTree(json);
             if (root == null || !root.isObject()) {
                 throw invalid("根节点不是 JSON 对象");
             }
-            E11QualityGateRespVO result = new E11QualityGateRespVO();
+            ImageQualityModelResult result = new ImageQualityModelResult();
             boolean passed = requiredBoolean(root, "passed");
             if (passed != (exitCode == 0)) {
                 throw invalid("passed 与进程退出码不一致");
@@ -57,7 +57,7 @@ final class E11GateReportParser {
             result.setConfidenceSummary(confidenceSummary(root.get("confidence_summary")));
             result.setImage(imageInfo(root.get("image")));
 
-            List<E11QualityGateRespVO.Detection> detections = detections(root.get("detections"), threshold);
+            List<ImageQualityModelResult.Detection> detections = detections(root.get("detections"), threshold);
             if (detections.size() != acceptedCount) {
                 throw invalid("detections 数量与 accepted_count 不一致");
             }
@@ -71,13 +71,13 @@ final class E11GateReportParser {
         }
     }
 
-    private List<E11QualityGateRespVO.Detection> detections(JsonNode node, double threshold) {
+    private List<ImageQualityModelResult.Detection> detections(JsonNode node, double threshold) {
         if (node == null || !node.isArray()) {
             throw invalid("detections 必须是数组");
         }
-        List<E11QualityGateRespVO.Detection> result = new ArrayList<>();
+        List<ImageQualityModelResult.Detection> result = new ArrayList<>();
         for (JsonNode item : node) {
-            E11QualityGateRespVO.Detection detection = new E11QualityGateRespVO.Detection();
+            ImageQualityModelResult.Detection detection = new ImageQualityModelResult.Detection();
             String label = requiredText(item, "label");
             if (!EXPECTED_LABEL.equals(label)) {
                 throw invalid("检测标签不是 CUTTING_TOOTH");
@@ -110,7 +110,7 @@ final class E11GateReportParser {
         return result;
     }
 
-    private E11QualityGateRespVO.ImageInfo imageInfo(JsonNode node) {
+    private ImageQualityModelResult.ImageInfo imageInfo(JsonNode node) {
         if (node == null || !node.isObject()) {
             throw invalid("image 必须是对象");
         }
@@ -119,17 +119,17 @@ final class E11GateReportParser {
         if (width == 0 || height == 0) {
             throw invalid("图片尺寸必须大于零");
         }
-        E11QualityGateRespVO.ImageInfo info = new E11QualityGateRespVO.ImageInfo();
+        ImageQualityModelResult.ImageInfo info = new ImageQualityModelResult.ImageInfo();
         info.setWidth(width);
         info.setHeight(height);
         return info;
     }
 
-    private E11QualityGateRespVO.ConfidenceSummary confidenceSummary(JsonNode node) {
+    private ImageQualityModelResult.ConfidenceSummary confidenceSummary(JsonNode node) {
         if (node == null || !node.isObject()) {
             throw invalid("confidence_summary 必须是对象");
         }
-        E11QualityGateRespVO.ConfidenceSummary summary = new E11QualityGateRespVO.ConfidenceSummary();
+        ImageQualityModelResult.ConfidenceSummary summary = new ImageQualityModelResult.ConfidenceSummary();
         summary.setMinimum(nullableDouble(node.get("minimum"), "minimum"));
         summary.setMaximum(nullableDouble(node.get("maximum"), "maximum"));
         summary.setMean(nullableDouble(node.get("mean"), "mean"));

@@ -1,79 +1,99 @@
-# E11 图片质量检测接口
+# 图片资产质检接口
 
-## 接口
+图片必须先通过数据资产模块完成导入。质检接口只接收 `drill_image_asset.id`，服务端通过资产记录的 `file_config_id` 和 `object_key` 读取原始文件，不再接收 multipart 文件。
 
-- 方法：`POST`
-- 地址：`/admin-api/drill/image-quality/check`
-- Content-Type：`multipart/form-data`
-- 鉴权：沿用管理端登录 Token，Header 为 `Authorization: Bearer <token>`
+## 执行质检
 
-表单字段：
+- 地址：`POST /admin-api/drill/image-quality/check`
+- Content-Type：`application/json`
+- 鉴权：已登录用户
 
-| 字段 | 类型 | 必填 | 默认值 | 说明 |
-| --- | --- | --- | --- | --- |
-| `file` | file | 是 | - | JPEG、PNG 或 WebP，最大 30 MB、5000 万像素 |
-| `confidence` | number | 否 | `0.75` | E11 置信度阈值，范围 `[0, 1]` |
-| `minDetections` | integer | 否 | `1` | 合格所需的最少有效切削齿数量，范围 `[1, 300]` |
+单图请求：
 
-调用示例：
-
-```bash
-curl -X POST "http://localhost:48080/admin-api/drill/image-quality/check" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -F "file=@sample.jpg" \
-  -F "confidence=0.75" \
-  -F "minDetections=1"
+```json
+{
+  "assetId": 1001,
+  "profileId": 10
+}
 ```
 
-## 正常响应
+多选请求（最多 20 张）：
 
-模型通过（退出码 `0`）和模型拒绝（退出码 `10`）均返回统一成功响应；调用方读取 `data.passed` 判断图片是否合格。
+```json
+{
+  "assetIds": [1001, 1002, 1003],
+  "confidence": 0.8,
+  "minDetections": 2
+}
+```
+
+`assetId` 与 `assetIds` 必须且只能提供一个。`profileId` 省略时使用当前租户的默认启用方案。`confidence` 和 `minDetections` 仅适用于 E11，并覆盖方案中保存的同名参数。
+
+响应始终使用批量包络，单图时 `items` 只有一项：
 
 ```json
 {
   "code": 0,
   "data": {
-    "passed": true,
-    "reason": "passed",
-    "modelVersion": "E11",
-    "threshold": 0.75,
-    "minDetections": 1,
-    "acceptedCount": 2,
-    "candidateCount": 3,
-    "rejectionCounts": {
-      "below_threshold": 1,
-      "invalid_polygon": 0,
-      "unexpected_label": 0
-    },
-    "confidenceSummary": {
-      "minimum": 0.82,
-      "maximum": 0.94,
-      "mean": 0.88
-    },
-    "image": {"width": 1920, "height": 1080},
-    "detections": [
+    "totalCount": 1,
+    "successCount": 1,
+    "failedCount": 0,
+    "items": [
       {
-        "label": "CUTTING_TOOTH",
-        "confidence": 0.94,
-        "polygon": [[123.4, 56.7], [180.0, 62.1], [170.2, 130.9]]
+        "recordId": 88,
+        "assetId": 1001,
+        "profileId": 10,
+        "profileCode": "E11_STANDARD",
+        "profileVersion": "1.0.0",
+        "modelCode": "E11",
+        "executionStatus": "SUCCESS",
+        "passed": true,
+        "reason": "passed",
+        "modelVersion": "E11",
+        "threshold": 0.75,
+        "minDetections": 1,
+        "acceptedCount": 3,
+        "candidateCount": 3,
+        "durationMs": 1320,
+        "effectiveConfig": {
+          "confidence": 0.75,
+          "minDetections": 1
+        }
       }
-    ],
-    "inferenceSpeedMs": {"preprocess": 4.2, "inference": 86.3, "postprocess": 5.1},
-    "durationMs": 536
+    ]
   },
   "msg": ""
 }
 ```
 
-服务不会向客户端返回模型路径或临时图片路径。模型不可用、超时、并发繁忙、参数错误或输出不符合契约时，返回 `1050000070` 至 `1050000077` 的业务错误码。
+`passed=false` 是模型正常执行后的业务结论，记录状态仍为 `SUCCESS`。文件丢失、模型超时或推理异常会生成 `FAILED` 记录；多选请求会继续处理后续资产。
 
-## 部署配置
+## 质检方案
 
-先安装 Python 3.10 或更高版本，再在 `e11_quality_gate_windows_20260804` 目录执行 `install.cmd`（交付包固定的 `onnxruntime==1.28.0` 不支持当前机器上的 Python 3.9）。默认配置适用于从 `yudao-boot-mini` 目录启动服务，也可通过环境变量覆盖：
+方案管理根路径为 `/admin-api/drill/quality-profile`，提供 `list/get/create/update/copy/enable/disable/set-default/delete`。当前模型编码为 `E11`，配置结构如下：
 
-- `E11_GATE_PYTHON`：虚拟环境 Python 的绝对路径；
-- `E11_GATE_SCRIPT`：`e11_quality_gate.py` 的绝对路径；
-- `E11_GATE_MODEL`：`e11.onnx` 的绝对路径；
+```json
+{
+  "confidence": 0.75,
+  "minDetections": 1
+}
+```
+
+方案状态为 `DRAFT`、`ENABLED`、`DISABLED`。只有草稿可修改，只有启用方案可设为默认，默认方案不能停用或删除。
+
+## 质检记录
+
+- `GET /admin-api/drill/image-quality-record/page`：按 `assetId`、`profileId`、`modelCode`、`executionStatus`、`passed` 分页查询。
+- `GET /admin-api/drill/image-quality-record/get?id=88`：查询完整记录。
+- `GET /admin-api/drill/image-quality-record/latest?assetId=1001`：查询资产最新记录。
+
+## E11 运行配置
+
+先在 `e11_quality_gate_windows_20260804` 目录执行 `install.cmd`。模型文件和运行时路径仍由 `application.yaml` 的 `drill.e11-quality-gate` 配置：
+
+- `E11_GATE_PYTHON`：虚拟环境 Python 路径；
+- `E11_GATE_SCRIPT`：模型入口脚本；
+- `E11_GATE_MODEL`：E11 ONNX 模型；
 - `E11_GATE_DEVICE`：默认 `cpu`。
 
-超时、并发数和排队等待时间在 `application.yaml` 的 `drill.e11-quality-gate` 下配置。
+超时、并发数和排队时间继续使用服务端配置，不能通过质检方案修改。
