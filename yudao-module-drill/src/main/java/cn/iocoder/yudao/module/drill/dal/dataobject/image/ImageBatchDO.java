@@ -30,6 +30,8 @@ public class ImageBatchDO extends TenantBaseDO {
     private Integer failedCount;
     private Integer duplicateCount;
     private Integer pendingMetadataCount;
+    private Integer sourcePackageCount;
+    private Integer failedPackageCount;
     private LocalDateTime finishedTime;
     private String remark;
 }

@@ -18,6 +18,7 @@ public interface ImageAssetMapper extends BaseMapperX<ImageAssetDO> {
                 .eqIfPresent(ImageAssetDO::getBatchId, reqVO.getBatchId())
                 .eqIfPresent(ImageAssetDO::getDrillType, reqVO.getDrillType())
                 .eqIfPresent(ImageAssetDO::getSceneType, reqVO.getSceneType())
+                .eqIfPresent(ImageAssetDO::getWellType, reqVO.getWellType())
                 .eqIfPresent(ImageAssetDO::getPhotoType, reqVO.getPhotoType())
                 .eqIfPresent(ImageAssetDO::getBladeNo, reqVO.getBladeNo())
                 .eqIfPresent(ImageAssetDO::getMetadataStatus, reqVO.getMetadataStatus())

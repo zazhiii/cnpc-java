@@ -17,6 +17,8 @@ public interface ImageBatchService {
      */
     Long createBatch(ImageBatchCreateReqVO createReqVO);
 
+    Long createZipBatch(String name, int sourcePackageCount);
+
     PageResult<ImageBatchDO> getBatchPage(ImageBatchPageReqVO pageReqVO);
 
     ImageBatchDO getBatch(Long id);
@@ -29,11 +31,18 @@ public interface ImageBatchService {
 
     void finishImport(Long id);
 
+    void finishImport(Long id, boolean sourcePartial);
+
+    void cancelImport(Long id);
+
     void deleteBatch(Long id) throws Exception;
 
     void updateImportStatistics(Long id, int total, int success, int failed,
                                 int duplicate, int pendingMetadata);
 
     void refreshMetadataStatistics(Long id);
+
+    void replaceImportStatistics(Long id, int total, int success, int failed,
+                                 int duplicate, int pendingMetadata, int failedPackages);
 
 }

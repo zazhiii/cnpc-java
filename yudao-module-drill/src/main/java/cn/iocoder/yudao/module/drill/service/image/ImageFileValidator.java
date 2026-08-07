@@ -28,11 +28,15 @@ public class ImageFileValidator {
     private static final Set<String> ALLOWED_FORMATS = Set.of("jpeg", "jpg", "png", "webp");
 
     public ImageInfo validate(byte[] content, String originalName) {
+        return validate(content, originalName, MAX_FILE_SIZE, MAX_PIXEL_COUNT);
+    }
+
+    public ImageInfo validate(byte[] content, String originalName, long maxFileSize, long maxPixelCount) {
         if (content == null || content.length == 0) {
             throw exception(IMAGE_FILE_EMPTY);
         }
-        if (content.length > MAX_FILE_SIZE) {
-            throw exception(IMAGE_FILE_TOO_LARGE, MAX_FILE_SIZE / 1024 / 1024);
+        if (content.length > maxFileSize) {
+            throw exception(IMAGE_FILE_TOO_LARGE, maxFileSize / 1024 / 1024);
         }
         try (ImageInputStream imageInput = ImageIO.createImageInputStream(new ByteArrayInputStream(content))) {
             if (imageInput == null) {
@@ -55,8 +59,8 @@ public class ImageFileValidator {
                 if (width <= 0 || height <= 0) {
                     throw exception(IMAGE_DECODE_FAILED);
                 }
-                if ((long) width * height > MAX_PIXEL_COUNT) {
-                    throw exception(IMAGE_DIMENSION_EXCEEDED, MAX_PIXEL_COUNT);
+                if ((long) width * height > maxPixelCount) {
+                    throw exception(IMAGE_DIMENSION_EXCEEDED, maxPixelCount);
                 }
                 return new ImageInfo(width, height, resolveMimeType(format));
             } finally {

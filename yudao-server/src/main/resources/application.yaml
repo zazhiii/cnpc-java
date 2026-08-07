@@ -370,6 +370,22 @@ debug: false
 
 # 钻头图像增强：默认使用数据库任务队列和本机 CPU。
 drill:
+  image-import:
+    executor:
+      core-size: 2
+      queue-capacity: 20
+    poll-interval: 2s
+    package-timeout: 30m
+    upload-timeout: 24h
+    max-retries: 3
+    max-packages-per-job: 1000
+    max-job-bytes: 10737418240
+    max-archive-bytes: 209715200
+    max-expanded-bytes: 2147483648
+    max-entries: 5000
+    max-compression-ratio: 100
+    max-image-bytes: 62914560
+    max-pixel-count: 50000000
   e11-quality-gate:
     # 运行 install.cmd 后会生成该 Python；生产环境建议通过环境变量配置绝对路径。
     python-executable: ${E11_GATE_PYTHON:../e11_quality_gate_windows_20260804/.venv/Scripts/python.exe}

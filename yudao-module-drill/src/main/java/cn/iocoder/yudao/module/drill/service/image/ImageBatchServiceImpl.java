@@ -7,9 +7,13 @@ import cn.iocoder.yudao.module.drill.controller.admin.image.vo.batch.ImageBatchC
 import cn.iocoder.yudao.module.drill.controller.admin.image.vo.batch.ImageBatchPageReqVO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.image.ImageAssetDO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.image.ImageBatchDO;
+import cn.iocoder.yudao.module.drill.dal.dataobject.image.ImageImportJobDO;
+import cn.iocoder.yudao.module.drill.dal.dataobject.image.ImageImportPackageDO;
 import cn.iocoder.yudao.module.drill.dal.mysql.image.ImageAssetMapper;
 import cn.iocoder.yudao.module.drill.dal.mysql.image.ImageBatchMapper;
 import cn.iocoder.yudao.module.drill.dal.mysql.image.ImageImportRecordMapper;
+import cn.iocoder.yudao.module.drill.dal.mysql.image.ImageImportJobMapper;
+import cn.iocoder.yudao.module.drill.dal.mysql.image.ImageImportPackageMapper;
 import cn.iocoder.yudao.module.infra.service.file.FileService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -40,6 +44,10 @@ public class ImageBatchServiceImpl implements ImageBatchService {
     @Resource
     private ImageImportRecordMapper imageImportRecordMapper;
     @Resource
+    private ImageImportJobMapper imageImportJobMapper;
+    @Resource
+    private ImageImportPackageMapper imageImportPackageMapper;
+    @Resource
     private ImageAssetReferenceService imageAssetReferenceService;
     @Resource
     private FileService fileService;
@@ -56,6 +64,27 @@ public class ImageBatchServiceImpl implements ImageBatchService {
         batch.setFailedCount(0);
         batch.setDuplicateCount(0);
         batch.setPendingMetadataCount(0);
+        batch.setSourcePackageCount(0);
+        batch.setFailedPackageCount(0);
+        imageBatchMapper.insert(batch);
+        return batch.getId();
+    }
+
+    @Override
+    public Long createZipBatch(String name, int sourcePackageCount) {
+        ImageBatchDO batch = new ImageBatchDO();
+        batch.setBatchNo("IMG-" + LocalDateTime.now().format(BATCH_NO_FORMATTER)
+                + "-" + RandomUtil.randomNumbers(4));
+        batch.setName(name);
+        batch.setSourceType(SOURCE_ZIP_DIRECTORY);
+        batch.setStatus(BATCH_STATUS_IMPORTING);
+        batch.setTotalCount(0);
+        batch.setSuccessCount(0);
+        batch.setFailedCount(0);
+        batch.setDuplicateCount(0);
+        batch.setPendingMetadataCount(0);
+        batch.setSourcePackageCount(sourcePackageCount);
+        batch.setFailedPackageCount(0);
         imageBatchMapper.insert(batch);
         return batch.getId();
     }
@@ -100,11 +129,23 @@ public class ImageBatchServiceImpl implements ImageBatchService {
 
     @Override
     public void finishImport(Long id) {
+        finishImport(id, false);
+    }
+
+    @Override
+    public void finishImport(Long id, boolean sourcePartial) {
         ImageBatchDO batch = validateBatchForImport(id);
         if (batch.getTotalCount() == null || batch.getTotalCount() == 0) {
             throw exception(IMAGE_BATCH_EMPTY);
         }
-        if (imageBatchMapper.finishImport(id) == 0) {
+        if (imageBatchMapper.finishImport(id, sourcePartial) == 0) {
+            throw exception(IMAGE_BATCH_STATUS_INVALID);
+        }
+    }
+
+    @Override
+    public void cancelImport(Long id) {
+        if (imageBatchMapper.cancelImport(id) == 0) {
             throw exception(IMAGE_BATCH_STATUS_INVALID);
         }
     }
@@ -123,6 +164,17 @@ public class ImageBatchServiceImpl implements ImageBatchService {
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
+        ImageImportJobDO importJob = imageImportJobMapper.selectByBatchId(id);
+        if (importJob != null) {
+            List<Long> archiveFileIds = imageImportPackageMapper.selectByJobId(importJob.getId()).stream()
+                    .map(ImageImportPackageDO::getArchiveFileId)
+                    .filter(Objects::nonNull).toList();
+            if (!archiveFileIds.isEmpty()) {
+                fileService.deleteFileList(archiveFileIds);
+            }
+            imageImportPackageMapper.deleteByJobId(importJob.getId());
+            imageImportJobMapper.deleteById(importJob.getId());
+        }
         if (!fileIds.isEmpty()) {
             fileService.deleteFileList(fileIds);
         }
@@ -141,6 +193,13 @@ public class ImageBatchServiceImpl implements ImageBatchService {
     @Override
     public void refreshMetadataStatistics(Long id) {
         imageBatchMapper.refreshMetadataStatistics(id);
+    }
+
+    @Override
+    public void replaceImportStatistics(Long id, int total, int success, int failed,
+                                        int duplicate, int pendingMetadata, int failedPackages) {
+        imageBatchMapper.replaceImportStatistics(id, total, success, failed, duplicate,
+                pendingMetadata, failedPackages);
     }
 
 }

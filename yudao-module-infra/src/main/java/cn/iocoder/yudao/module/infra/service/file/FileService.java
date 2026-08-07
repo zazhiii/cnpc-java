@@ -8,6 +8,7 @@ import cn.iocoder.yudao.module.infra.dal.dataobject.file.FileDO;
 import jakarta.validation.constraints.NotEmpty;
 
 import java.util.List;
+import java.nio.file.Path;
 
 /**
  * 文件 Service 接口
@@ -95,6 +96,10 @@ public interface FileService {
      * @return 文件内容
      */
     byte[] getFileContent(Long configId, String path) throws Exception;
+
+    long downloadFile(Long configId, String path, Path target, long maxBytes) throws Exception;
+
+    void deleteObject(Long configId, String path) throws Exception;
 
     /**
      * 获得文件

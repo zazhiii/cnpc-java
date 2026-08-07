@@ -9,11 +9,13 @@ import cn.iocoder.yudao.module.drill.controller.admin.image.vo.asset.ImageAssetU
 import cn.iocoder.yudao.module.drill.controller.admin.image.vo.asset.ImageImportCompleteReqVO;
 import cn.iocoder.yudao.module.drill.controller.admin.image.vo.asset.ImageImportRespVO;
 import cn.iocoder.yudao.module.drill.controller.admin.image.vo.asset.ImagePresignedUploadReqVO;
+import cn.iocoder.yudao.module.drill.config.ImageImportProperties;
 import cn.iocoder.yudao.module.drill.dal.dataobject.image.ImageAssetDO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.image.ImageBatchDO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.image.ImageImportRecordDO;
 import cn.iocoder.yudao.module.drill.dal.mysql.image.ImageAssetMapper;
 import cn.iocoder.yudao.module.drill.dal.mysql.image.ImageImportRecordMapper;
+import cn.iocoder.yudao.module.drill.service.image.model.ArchiveImageImportRequest;
 import cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.FileCreateReqVO;
 import cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.FilePresignedUrlRespVO;
 import cn.iocoder.yudao.module.infra.dal.dataobject.file.FileDO;
@@ -22,6 +24,7 @@ import jakarta.annotation.Resource;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -57,6 +60,8 @@ public class ImageImportServiceImpl implements ImageImportService {
     private FileService fileService;
     @Resource
     private TransactionTemplate transactionTemplate;
+    @Resource
+    private ImageImportProperties imageImportProperties;
 
     @Override
     public ImageImportRespVO uploadAndImport(ImageAssetUploadReqVO uploadReqVO) {
@@ -119,6 +124,82 @@ public class ImageImportServiceImpl implements ImageImportService {
         return result;
     }
 
+    @Override
+    public ImageImportRespVO.Item importArchiveImage(ArchiveImageImportRequest request) {
+        ImageBatchDO batch = imageBatchService.validateBatchForImport(request.getBatchId());
+        ImageImportRecordDO existing = imageImportRecordMapper.selectByPackageAndEntry(
+                request.getPackageId(), request.getEntryPath());
+        if (existing != null && (IMPORT_RESULT_CREATED.equals(existing.getResult())
+                || IMPORT_RESULT_DUPLICATE.equals(existing.getResult()))) {
+            return toItem(existing);
+        }
+        Candidate candidate = new Candidate();
+        candidate.setJobId(request.getJobId());
+        candidate.setPackageId(request.getPackageId());
+        candidate.setSourceEntryPath(request.getEntryPath());
+        candidate.setOriginalName(request.getOriginalName());
+        candidate.setWellType(request.getWellType());
+        candidate.setContent(request.getContent());
+        try {
+            ImageFileValidator.ImageInfo imageInfo = imageFileValidator.validate(request.getContent(),
+                    request.getOriginalName(), imageImportProperties.getMaxImageBytes(),
+                    imageImportProperties.getMaxPixelCount());
+            candidate.setSha256(DigestUtil.sha256Hex(request.getContent()));
+            candidate.setWidth(imageInfo.getWidth());
+            candidate.setHeight(imageInfo.getHeight());
+            candidate.setMimeType(imageInfo.getMimeType());
+            candidate.setMetadataStatus(METADATA_STATUS_PENDING);
+            candidate.setWarningCode(hasExtensionMismatch(request.getOriginalName(), imageInfo.getMimeType())
+                    ? "CONTENT_EXTENSION_MISMATCH" : null);
+            ImageAssetDO duplicate = imageAssetMapper.selectBySha256(candidate.getSha256());
+            if (duplicate != null) {
+                return recordDuplicate(batch.getId(), candidate, duplicate, (long) request.getContent().length);
+            }
+            String storageName = candidate.getSha256() + extensionFor(candidate.getMimeType());
+            String url = fileService.createFile(candidate.getContent(), storageName,
+                    buildOriginalDirectory(batch.getId()), candidate.getMimeType());
+            FileDO file = fileService.getFileByUrl(url);
+            if (file == null) {
+                throw exception(IMAGE_FILE_RECORD_MISSING);
+            }
+            try {
+                return createAssetAndRecordInTransaction(batch, candidate, file, SOURCE_ZIP_ARCHIVE);
+            } catch (DuplicateKeyException ex) {
+                deleteFileQuietly(file.getId());
+                ImageAssetDO concurrentDuplicate = imageAssetMapper.selectBySha256(candidate.getSha256());
+                if (concurrentDuplicate != null) {
+                    return recordDuplicate(batch.getId(), candidate, concurrentDuplicate,
+                            (long) request.getContent().length);
+                }
+                throw ex;
+            } catch (RuntimeException ex) {
+                deleteFileQuietly(file.getId());
+                throw ex;
+            }
+        } catch (Exception ex) {
+            ImageImportRespVO.Item item = failureItem(null, request.getOriginalName(), ex);
+            upsertImportRecord(batch.getId(), item, (long) request.getContent().length,
+                    candidate.getSha256(), candidate);
+            return item;
+        }
+    }
+
+    @Override
+    public ImageImportRespVO.Item recordArchiveFailure(ArchiveImageImportRequest request,
+                                                        String errorCode, String errorMessage) {
+        imageBatchService.validateBatchForImport(request.getBatchId());
+        Candidate candidate = new Candidate();
+        candidate.setJobId(request.getJobId());
+        candidate.setPackageId(request.getPackageId());
+        candidate.setSourceEntryPath(request.getEntryPath());
+        candidate.setOriginalName(request.getOriginalName());
+        candidate.setWellType(request.getWellType());
+        ImageImportRespVO.Item item = new ImageImportRespVO.Item(null, request.getOriginalName(),
+                null, null, IMPORT_RESULT_FAILED, errorCode, StrUtil.maxLength(errorMessage, 500));
+        upsertImportRecord(request.getBatchId(), item, null, null, candidate);
+        return item;
+    }
+
     private ImageImportRespVO.Item importDirectFile(ImageBatchDO batch, Candidate candidate,
                                                      String clientMimeType) {
         ImageAssetDO duplicate = imageAssetMapper.selectBySha256(candidate.getSha256());
@@ -176,10 +257,13 @@ public class ImageImportServiceImpl implements ImageImportService {
                 .setDrillCode(candidate.getDrillCode())
                 .setDrillType(candidate.getDrillType())
                 .setSceneType(StrUtil.blankToDefault(candidate.getSceneType(), batch.getSceneType()))
+                .setWellType(candidate.getWellType())
                 .setPhotoType(candidate.getPhotoType())
                 .setBladeNo(candidate.getBladeNo())
                 .setSourceType(sourceType)
                 .setSourceBizId(candidate.getClientFileId())
+                .setSourcePackageId(candidate.getPackageId())
+                .setSourceEntryPath(candidate.getSourceEntryPath())
                 .setOriginalFileId(file.getId())
                 .setFileConfigId(file.getConfigId())
                 .setObjectKey(file.getPath())
@@ -196,7 +280,7 @@ public class ImageImportServiceImpl implements ImageImportService {
         imageAssetMapper.insert(asset);
         ImageImportRespVO.Item item = new ImageImportRespVO.Item(candidate.getClientFileId(),
                 candidate.getOriginalName(), asset.getId(), null, IMPORT_RESULT_CREATED, null, null);
-        insertImportRecord(batch.getId(), item, asset.getFileSize(), asset.getSha256());
+        upsertImportRecord(batch.getId(), item, asset.getFileSize(), asset.getSha256(), candidate);
         return item;
     }
 
@@ -278,7 +362,7 @@ public class ImageImportServiceImpl implements ImageImportService {
         ImageImportRespVO.Item item = new ImageImportRespVO.Item(candidate.getClientFileId(),
                 candidate.getOriginalName(), null, duplicate.getId(), IMPORT_RESULT_DUPLICATE,
                 null, "文件内容已存在");
-        insertImportRecord(batchId, item, fileSize, candidate.getSha256());
+        upsertImportRecord(batchId, item, fileSize, candidate.getSha256(), candidate);
         return item;
     }
 
@@ -304,17 +388,59 @@ public class ImageImportServiceImpl implements ImageImportService {
     }
 
     private void insertImportRecord(Long batchId, ImageImportRespVO.Item item, Long fileSize, String sha256) {
-        imageImportRecordMapper.insert(new ImageImportRecordDO()
+        upsertImportRecord(batchId, item, fileSize, sha256, null);
+    }
+
+    private void upsertImportRecord(Long batchId, ImageImportRespVO.Item item, Long fileSize,
+                                    String sha256, Candidate candidate) {
+        ImageImportRecordDO record = candidate != null && candidate.getPackageId() != null
+                ? imageImportRecordMapper.selectByPackageAndEntry(candidate.getPackageId(), candidate.getSourceEntryPath())
+                : null;
+        boolean inserting = record == null;
+        if (record == null) {
+            record = new ImageImportRecordDO();
+            record.setAttemptCount(1);
+        } else {
+            record.setAttemptCount(record.getAttemptCount() == null ? 1 : record.getAttemptCount() + 1);
+        }
+        record
                 .setBatchId(batchId)
+                .setJobId(candidate == null ? null : candidate.getJobId())
+                .setPackageId(candidate == null ? null : candidate.getPackageId())
                 .setClientFileId(item.getClientFileId())
+                .setSourceEntryPath(candidate == null ? null : candidate.getSourceEntryPath())
                 .setOriginalName(item.getOriginalName())
                 .setFileSize(fileSize)
                 .setSha256(sha256)
+                .setDetectedMimeType(candidate == null ? null : candidate.getMimeType())
+                .setWarningCode(candidate == null ? null : candidate.getWarningCode())
                 .setResult(item.getResult())
                 .setAssetId(item.getAssetId())
                 .setDuplicateAssetId(item.getDuplicateAssetId())
                 .setErrorCode(item.getErrorCode())
-                .setErrorMessage(item.getErrorMessage()));
+                .setErrorMessage(item.getErrorMessage());
+        if (inserting) {
+            imageImportRecordMapper.insert(record);
+        } else {
+            imageImportRecordMapper.updateById(record);
+        }
+    }
+
+    private ImageImportRespVO.Item toItem(ImageImportRecordDO record) {
+        return new ImageImportRespVO.Item(record.getClientFileId(), record.getOriginalName(),
+                record.getAssetId(), record.getDuplicateAssetId(), record.getResult(),
+                record.getErrorCode(), record.getErrorMessage());
+    }
+
+    private boolean hasExtensionMismatch(String name, String mimeType) {
+        String extension = StrUtil.subAfter(name, '.', true).toLowerCase();
+        return ("image/png".equals(mimeType) && !"png".equals(extension))
+                || ("image/jpeg".equals(mimeType)
+                && !("jpg".equals(extension) || "jpeg".equals(extension)));
+    }
+
+    private String extensionFor(String mimeType) {
+        return "image/png".equals(mimeType) ? ".png" : ".jpg";
     }
 
     private void deleteFileQuietly(Long fileId) {
@@ -337,6 +463,9 @@ public class ImageImportServiceImpl implements ImageImportService {
     @Data
     private static class Candidate {
         private String clientFileId;
+        private Long jobId;
+        private Long packageId;
+        private String sourceEntryPath;
         private String originalName;
         private byte[] content;
         private String sha256;
@@ -346,10 +475,12 @@ public class ImageImportServiceImpl implements ImageImportService {
         private String drillCode;
         private String drillType;
         private String sceneType;
+        private String wellType;
         private String photoType;
         private String bladeNo;
         private String metadataStatus;
         private String remark;
+        private String warningCode;
     }
 
 }

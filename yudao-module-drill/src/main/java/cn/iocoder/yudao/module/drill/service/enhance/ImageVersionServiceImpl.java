@@ -133,7 +133,7 @@ public class ImageVersionServiceImpl implements ImageVersionService {
             version.setDefaultVersion(false);
             versionMapper.insert(version);
         }
-        imageAssetReferenceService.bindAssets(Set.of(assetId), REFERENCE_BIZ_ENHANCE_VERSION, version.getId());
+//        imageAssetReferenceService.bindAssets(Set.of(assetId), REFERENCE_BIZ_ENHANCE_VERSION, version.getId());
         publish(version.getId(), req);
     }
 

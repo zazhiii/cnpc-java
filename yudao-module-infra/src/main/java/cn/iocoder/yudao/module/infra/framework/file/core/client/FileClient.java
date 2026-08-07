@@ -1,5 +1,8 @@
 package cn.iocoder.yudao.module.infra.framework.file.core.client;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+
 /**
  * 文件客户端
  *
@@ -39,6 +42,12 @@ public interface FileClient {
      * @return 文件的内容
      */
     byte[] getContent(String path) throws Exception;
+
+    /** 流式读取文件；S3/本地客户端覆盖此实现，其他客户端保持兼容。调用方必须关闭。 */
+    default InputStream getContentStream(String path) throws Exception {
+        byte[] content = getContent(path);
+        return content == null ? null : new ByteArrayInputStream(content);
+    }
 
     // ========== 文件签名，目前仅 S3 支持 ==========
 

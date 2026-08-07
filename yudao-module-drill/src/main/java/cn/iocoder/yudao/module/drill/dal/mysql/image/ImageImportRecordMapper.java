@@ -8,6 +8,8 @@ import cn.iocoder.yudao.module.drill.dal.dataobject.image.ImageImportRecordDO;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.apache.ibatis.annotations.Mapper;
 
+import java.util.List;
+
 @Mapper
 public interface ImageImportRecordMapper extends BaseMapperX<ImageImportRecordDO> {
 
@@ -25,6 +27,22 @@ public interface ImageImportRecordMapper extends BaseMapperX<ImageImportRecordDO
     default void deleteByBatchId(Long batchId) {
         delete(new LambdaQueryWrapper<ImageImportRecordDO>()
                 .eq(ImageImportRecordDO::getBatchId, batchId));
+    }
+
+    default ImageImportRecordDO selectByPackageAndEntry(Long packageId, String entryPath) {
+        return selectOne(new LambdaQueryWrapper<ImageImportRecordDO>()
+                .eq(ImageImportRecordDO::getPackageId, packageId)
+                .eq(ImageImportRecordDO::getSourceEntryPath, entryPath));
+    }
+
+    default List<ImageImportRecordDO> selectByPackageId(Long packageId) {
+        return selectList(new LambdaQueryWrapper<ImageImportRecordDO>()
+                .eq(ImageImportRecordDO::getPackageId, packageId));
+    }
+
+    default List<ImageImportRecordDO> selectByJobId(Long jobId) {
+        return selectList(new LambdaQueryWrapper<ImageImportRecordDO>()
+                .eq(ImageImportRecordDO::getJobId, jobId));
     }
 
 }

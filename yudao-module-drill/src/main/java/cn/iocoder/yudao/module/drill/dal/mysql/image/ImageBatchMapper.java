@@ -62,7 +62,8 @@ public interface ImageBatchMapper extends BaseMapperX<ImageBatchDO> {
     @Update("""
             UPDATE drill_image_batch
             SET status = CASE
-                    WHEN success_count > 0 AND failed_count > 0 THEN 'PARTIAL_READY'
+                    WHEN success_count > 0 AND (failed_count > 0 OR failed_package_count > 0
+                         OR #{sourcePartial} = TRUE) THEN 'PARTIAL_READY'
                     WHEN success_count > 0 THEN 'READY'
                     ELSE 'FAILED'
                 END,
@@ -73,6 +74,26 @@ public interface ImageBatchMapper extends BaseMapperX<ImageBatchDO> {
               AND total_count > 0
               AND deleted = 0
             """)
-    int finishImport(@Param("id") Long id);
+    int finishImport(@Param("id") Long id, @Param("sourcePartial") boolean sourcePartial);
+
+    @Update("""
+            UPDATE drill_image_batch
+            SET total_count = #{total}, success_count = #{success}, failed_count = #{failed},
+                duplicate_count = #{duplicate}, pending_metadata_count = #{pendingMetadata},
+                failed_package_count = #{failedPackages}, update_time = CURRENT_TIMESTAMP
+            WHERE id = #{id} AND status = 'IMPORTING' AND deleted = 0
+            """)
+    int replaceImportStatistics(@Param("id") Long id, @Param("total") int total,
+                                @Param("success") int success, @Param("failed") int failed,
+                                @Param("duplicate") int duplicate,
+                                @Param("pendingMetadata") int pendingMetadata,
+                                @Param("failedPackages") int failedPackages);
+
+    @Update("""
+            UPDATE drill_image_batch
+            SET status = 'FAILED', finished_time = CURRENT_TIMESTAMP, update_time = CURRENT_TIMESTAMP
+            WHERE id = #{id} AND status = 'IMPORTING' AND deleted = 0
+            """)
+    int cancelImport(@Param("id") Long id);
 
 }

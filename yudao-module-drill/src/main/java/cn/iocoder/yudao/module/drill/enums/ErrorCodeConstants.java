@@ -27,6 +27,13 @@ public interface ErrorCodeConstants {
     ErrorCode IMAGE_BATCH_EMPTY = new ErrorCode(1_050_000_015, "空批次不能完成导入");
     ErrorCode IMAGE_BATCH_NOT_READY = new ErrorCode(1_050_000_016, "图片批次尚未完成导入");
     ErrorCode IMAGE_BATCH_REFERENCED = new ErrorCode(1_050_000_017, "图片批次已被业务任务引用，不能删除");
+    ErrorCode IMAGE_IMPORT_JOB_NOT_EXISTS = new ErrorCode(1_050_000_100, "图片导入任务不存在");
+    ErrorCode IMAGE_IMPORT_PACKAGE_NOT_EXISTS = new ErrorCode(1_050_000_101, "ZIP 导入包不存在");
+    ErrorCode IMAGE_IMPORT_JOB_STATE_INVALID = new ErrorCode(1_050_000_102, "当前导入任务状态不允许执行该操作");
+    ErrorCode IMAGE_IMPORT_PACKAGE_STATE_INVALID = new ErrorCode(1_050_000_103, "当前 ZIP 导入包状态不允许执行该操作");
+    ErrorCode IMAGE_IMPORT_MANIFEST_INVALID = new ErrorCode(1_050_000_104, "ZIP 导入清单不合法：{}");
+    ErrorCode IMAGE_IMPORT_UPLOAD_MISMATCH = new ErrorCode(1_050_000_105, "ZIP 上传信息与服务端签发信息不一致");
+    ErrorCode IMAGE_IMPORT_ARCHIVE_INVALID = new ErrorCode(1_050_000_106, "ZIP 压缩包不合法：{}");
     ErrorCode ENHANCE_PROFILE_NOT_EXISTS = new ErrorCode(1_050_000_020, "增强方案不存在");
     ErrorCode ENHANCE_PROFILE_DUPLICATE = new ErrorCode(1_050_000_021, "增强方案编码和版本已存在");
     ErrorCode ENHANCE_PROFILE_STATE_INVALID = new ErrorCode(1_050_000_022, "当前增强方案状态不允许该操作");

@@ -65,7 +65,7 @@ public class ImageQualityRecordServiceImpl implements ImageQualityRecordService 
         record.setDurationMs(result.getDurationMs());
         record.setFinishedAt(LocalDateTime.now());
         recordMapper.insert(record);
-        assetReferenceService.bindAssets(List.of(assetId), REFERENCE_BIZ_QUALITY_RECORD, record.getId());
+//        assetReferenceService.bindAssets(List.of(assetId), REFERENCE_BIZ_QUALITY_RECORD, record.getId());
         return record;
     }
 
@@ -82,7 +82,7 @@ public class ImageQualityRecordServiceImpl implements ImageQualityRecordService 
         record.setDurationMs(durationMs);
         record.setFinishedAt(LocalDateTime.now());
         recordMapper.insert(record);
-        assetReferenceService.bindAssets(List.of(assetId), REFERENCE_BIZ_QUALITY_RECORD, record.getId());
+//        assetReferenceService.bindAssets(List.of(assetId), REFERENCE_BIZ_QUALITY_RECORD, record.getId());
         return record;
     }
 

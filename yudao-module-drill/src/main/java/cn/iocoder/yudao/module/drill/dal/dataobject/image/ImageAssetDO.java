@@ -24,10 +24,13 @@ public class ImageAssetDO extends TenantBaseDO {
     private String drillCode;
     private String drillType;
     private String sceneType;
+    private String wellType;
     private String photoType;
     private String bladeNo;
     private String sourceType;
     private String sourceBizId;
+    private Long sourcePackageId;
+    private String sourceEntryPath;
     private Long originalFileId;
     private Long fileConfigId;
     private String objectKey;

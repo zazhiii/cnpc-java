@@ -11,10 +11,16 @@ public class ImageImportRecordRespVO {
 
     private Long id;
     private Long batchId;
+    private Long jobId;
+    private Long packageId;
     private String clientFileId;
+    private String sourceEntryPath;
     private String originalName;
     private Long fileSize;
     private String sha256;
+    private String detectedMimeType;
+    private Integer attemptCount;
+    private String warningCode;
     private String result;
     private Long assetId;
     private Long duplicateAssetId;

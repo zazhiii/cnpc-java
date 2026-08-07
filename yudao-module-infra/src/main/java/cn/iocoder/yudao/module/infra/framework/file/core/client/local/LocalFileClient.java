@@ -7,6 +7,9 @@ import cn.iocoder.yudao.module.infra.framework.file.core.utils.FilePathUtils;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.Files;
+import java.io.InputStream;
+import java.io.IOException;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.FILE_PATH_INVALID;
@@ -52,6 +55,11 @@ public class LocalFileClient extends AbstractFileClient<LocalFileClientConfig> {
             }
             throw ex;
         }
+    }
+
+    @Override
+    public InputStream getContentStream(String path) throws IOException {
+        return Files.newInputStream(Paths.get(getFilePath(path)));
     }
 
     private String getFilePath(String path) {

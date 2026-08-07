@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.*;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
-@Tag(name = "管理后台 - 钻头图片资产")
+@Tag(name = "图像导入 - 图片资产")
 @RestController
 @RequestMapping("/drill/image-asset")
 @Validated

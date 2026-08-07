@@ -23,6 +23,10 @@ import lombok.SneakyThrows;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static cn.hutool.core.date.DatePattern.PURE_DATE_PATTERN;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
@@ -243,6 +247,38 @@ public class FileServiceImpl implements FileService {
         Assert.notNull(client, "客户端({}) 不能为空", configId);
         // 2.2 获取文件内容
         return client.getContent(path);
+    }
+
+    @Override
+    public long downloadFile(Long configId, String path, Path target, long maxBytes) throws Exception {
+        FilePathUtils.validatePath(path);
+        FileClient client = fileConfigService.getFileClient(configId);
+        Assert.notNull(client, "客户端({}) 不能为空", configId);
+        long total = 0;
+        try (InputStream input = client.getContentStream(path);
+             OutputStream output = Files.newOutputStream(target)) {
+            if (input == null) {
+                throw exception(FILE_NOT_EXISTS);
+            }
+            byte[] buffer = new byte[64 * 1024];
+            int length;
+            while ((length = input.read(buffer)) >= 0) {
+                total += length;
+                if (total > maxBytes) {
+                    throw new IllegalArgumentException("文件超过允许大小");
+                }
+                output.write(buffer, 0, length);
+            }
+        }
+        return total;
+    }
+
+    @Override
+    public void deleteObject(Long configId, String path) throws Exception {
+        FilePathUtils.validatePath(path);
+        FileClient client = fileConfigService.getFileClient(configId);
+        Assert.notNull(client, "客户端({}) 不能为空", configId);
+        client.delete(path);
     }
 
     @Override

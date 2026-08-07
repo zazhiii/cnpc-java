@@ -23,6 +23,7 @@ import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignReques
 import java.net.URI;
 import java.net.URL;
 import java.time.Duration;
+import java.io.InputStream;
 
 /**
  * 基于 S3 协议的文件客户端，实现 MinIO、阿里云、腾讯云、七牛云、华为云等云服务
@@ -103,6 +104,13 @@ public class S3FileClient extends AbstractFileClient<S3FileClientConfig> {
                 .key(path)
                 .build();
         return IoUtil.readBytes(client.getObject(getRequest));
+    }
+
+    @Override
+    public InputStream getContentStream(String path) {
+        GetObjectRequest getRequest = GetObjectRequest.builder()
+                .bucket(config.getBucket()).key(path).build();
+        return client.getObject(getRequest);
     }
 
     @Override

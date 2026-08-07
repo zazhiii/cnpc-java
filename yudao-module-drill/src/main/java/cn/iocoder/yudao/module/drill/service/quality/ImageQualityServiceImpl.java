@@ -49,6 +49,8 @@ public class ImageQualityServiceImpl implements ImageQualityService {
     @Override
     public ImageQualityCheckRespVO check(ImageQualityCheckReqVO reqVO) {
         List<Long> assetIds = resolveAssetIds(reqVO);
+
+        // 获取质检方案
         QualityProfileDO profile = reqVO.getProfileId() == null
                 ? profileService.getDefaultEnabled() : profileService.getEnabled(reqVO.getProfileId());
         ImageQualityModelExecutor executor = modelRegistry.getRequired(profile.getModelCode());
@@ -56,16 +58,20 @@ public class ImageQualityServiceImpl implements ImageQualityService {
         executor.validateConfig(effectiveConfig);
         executor.checkAvailability();
 
+        // 获取图片
         Map<Long, ImageAssetDO> assets = imageAssetService.getAssets(assetIds).stream()
                 .collect(Collectors.toMap(ImageAssetDO::getId, Function.identity()));
         if (assets.size() != assetIds.size()) {
             throw exception(IMAGE_ASSET_NOT_EXISTS);
         }
 
+        // 质检并添加每一个质检结果
         List<ImageQualityCheckRespVO.Item> items = new ArrayList<>(assetIds.size());
         for (Long assetId : assetIds) {
             items.add(checkOne(assets.get(assetId), profile, executor, effectiveConfig));
         }
+
+        // 构建最终结果
         ImageQualityCheckRespVO response = new ImageQualityCheckRespVO();
         response.setItems(items);
         response.setTotalCount(items.size());
@@ -114,9 +120,9 @@ public class ImageQualityServiceImpl implements ImageQualityService {
             throw exception(QUALITY_CHECK_REQUEST_INVALID, "assetId 和 assetIds 必须且只能提供一个");
         }
         List<Long> ids = hasAssetId ? List.of(reqVO.getAssetId()) : reqVO.getAssetIds();
-        if (ids.size() > MAX_ASSET_COUNT) {
-            throw exception(QUALITY_CHECK_REQUEST_INVALID, "一次最多质检 20 张图片");
-        }
+//        if (ids.size() > MAX_ASSET_COUNT) {
+//            throw exception(QUALITY_CHECK_REQUEST_INVALID, "一次最多质检 20 张图片");
+//        }
         if (ids.stream().anyMatch(id -> id == null || id <= 0)) {
             throw exception(QUALITY_CHECK_REQUEST_INVALID, "资产编号必须为正整数");
         }

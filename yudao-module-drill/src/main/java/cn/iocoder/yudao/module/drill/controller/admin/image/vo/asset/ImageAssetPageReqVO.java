@@ -14,6 +14,7 @@ public class ImageAssetPageReqVO extends PageParam {
     private String keyword;
     private String drillType;
     private String sceneType;
+    private String wellType;
     private String photoType;
     private String bladeNo;
     private String metadataStatus;
