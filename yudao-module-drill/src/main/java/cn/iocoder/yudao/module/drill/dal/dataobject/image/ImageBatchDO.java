@@ -21,9 +21,9 @@ public class ImageBatchDO extends TenantBaseDO {
     private Long id;
     private String batchNo;
     private String name;
-    private String sourceType;
-    private Long projectId;
-    private String sceneType;
+    private String sourceType; // 来源类型（本地图片、本地ZIP）
+//    private Long projectId;
+//    private String sceneType;
     private String status;
     private Integer totalCount;
     private Integer successCount;

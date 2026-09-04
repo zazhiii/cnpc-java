@@ -45,7 +45,7 @@ import static cn.iocoder.yudao.module.drill.enums.ImageImportConstants.*;
 public class ImageImportServiceImpl implements ImageImportService {
 
     private static final DateTimeFormatter ASSET_NO_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
-    private static final String ARCHIVE_STATUS_ACTIVE = "ACTIVE";
+//    private static final String ARCHIVE_STATUS_ACTIVE = "ACTIVE";
     private static final String UNKNOWN_POLICY_SKIP = "SKIP";
 
     @Resource
@@ -253,10 +253,10 @@ public class ImageImportServiceImpl implements ImageImportService {
         ImageAssetDO asset = new ImageAssetDO()
                 .setAssetNo(generateAssetNo())
                 .setBatchId(batch.getId())
-                .setProjectId(batch.getProjectId())
+//                .setProjectId(batch.getProjectId())
                 .setDrillCode(candidate.getDrillCode())
                 .setDrillType(candidate.getDrillType())
-                .setSceneType(StrUtil.blankToDefault(candidate.getSceneType(), batch.getSceneType()))
+//                .setSceneType(StrUtil.blankToDefault(candidate.getSceneType(), batch.getSceneType()))
                 .setWellType(candidate.getWellType())
                 .setPhotoType(candidate.getPhotoType())
                 .setBladeNo(candidate.getBladeNo())
@@ -275,7 +275,7 @@ public class ImageImportServiceImpl implements ImageImportService {
                 .setHeight(candidate.getHeight())
                 .setSha256(candidate.getSha256())
                 .setMetadataStatus(candidate.getMetadataStatus())
-                .setArchiveStatus(ARCHIVE_STATUS_ACTIVE)
+//                .setArchiveStatus(ARCHIVE_STATUS_ACTIVE)
                 .setRemark(candidate.getRemark());
         imageAssetMapper.insert(asset);
         ImageImportRespVO.Item item = new ImageImportRespVO.Item(candidate.getClientFileId(),

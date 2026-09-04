@@ -20,7 +20,7 @@ public class ImageAssetDO extends TenantBaseDO {
     private Long id;
     private String assetNo;
     private Long batchId;
-    private Long projectId;
+//    private Long projectId;
     private String drillCode;
     private String drillType;
     private String sceneType;

@@ -68,7 +68,7 @@ public class ImageQualityServiceImpl implements ImageQualityService {
         // 质检并添加每一个质检结果
         List<ImageQualityCheckRespVO.Item> items = new ArrayList<>(assetIds.size());
         for (Long assetId : assetIds) {
-            items.add(checkOne(assets.get(assetId), profile, executor, effectiveConfig));
+            items.add(e11ModelCheckOne(assets.get(assetId), profile, executor, effectiveConfig));
         }
 
         // 构建最终结果
@@ -81,9 +81,9 @@ public class ImageQualityServiceImpl implements ImageQualityService {
         return response;
     }
 
-    private ImageQualityCheckRespVO.Item checkOne(ImageAssetDO asset, QualityProfileDO profile,
-                                                  ImageQualityModelExecutor executor,
-                                                  Map<String, Object> effectiveConfig) {
+    private ImageQualityCheckRespVO.Item e11ModelCheckOne(ImageAssetDO asset, QualityProfileDO profile,
+                                                          ImageQualityModelExecutor executor,
+                                                          Map<String, Object> effectiveConfig) {
         LocalDateTime startedAt = LocalDateTime.now();
         long startedNanos = System.nanoTime();
         try {

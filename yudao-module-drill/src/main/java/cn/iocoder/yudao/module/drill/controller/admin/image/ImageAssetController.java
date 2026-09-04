@@ -74,8 +74,7 @@ public class ImageAssetController {
     @GetMapping("/page")
     @Operation(summary = "获得图片资产分页")
     @PreAuthorize("@ss.hasPermission('drill:image-asset:query')")
-    public CommonResult<PageResult<ImageAssetRespVO>> getAssetPage(
-            @Valid ImageAssetPageReqVO pageReqVO) {
+    public CommonResult<PageResult<ImageAssetRespVO>> getAssetPage(@Valid ImageAssetPageReqVO pageReqVO) {
         PageResult<ImageAssetDO> pageResult = imageAssetService.getAssetPage(pageReqVO);
         return success(new PageResult<>(pageResult.getList().stream()
                 .map(this::convertAssetResp)

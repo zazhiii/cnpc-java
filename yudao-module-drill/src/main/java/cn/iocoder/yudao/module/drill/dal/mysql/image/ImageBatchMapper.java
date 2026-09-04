@@ -16,7 +16,7 @@ public interface ImageBatchMapper extends BaseMapperX<ImageBatchDO> {
         return selectPage(reqVO, new LambdaQueryWrapperX<ImageBatchDO>()
                 .eqIfPresent(ImageBatchDO::getSourceType, reqVO.getSourceType())
                 .eqIfPresent(ImageBatchDO::getStatus, reqVO.getStatus())
-                .eqIfPresent(ImageBatchDO::getProjectId, reqVO.getProjectId())
+//                .eqIfPresent(ImageBatchDO::getProjectId, reqVO.getProjectId())
                 .betweenIfPresent(ImageBatchDO::getCreateTime, reqVO.getCreateTime())
                 .and(reqVO.getKeyword() != null, wrapper -> wrapper
                         .like(ImageBatchDO::getBatchNo, reqVO.getKeyword())

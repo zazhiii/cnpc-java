@@ -12,7 +12,7 @@ spring:
   servlet:
     # 文件上传相关配置项
     multipart:
-      max-file-size: 30MB # 图片导入单文件上限
+      max-file-size: 50MB # 图片导入单文件上限
       max-request-size: 300MB # 图片导入单批请求上限；更大批次使用预签名直传
 
   # Jackson 配置项
@@ -384,7 +384,7 @@ drill:
     max-expanded-bytes: 2147483648
     max-entries: 5000
     max-compression-ratio: 100
-    max-image-bytes: 62914560
+    max-image-bytes: 52428800
     max-pixel-count: 50000000
   e11-quality-gate:
     # 运行 install.cmd 后会生成该 Python；生产环境建议通过环境变量配置绝对路径。

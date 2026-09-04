@@ -192,10 +192,22 @@ public class S3FileClient extends AbstractFileClient<S3FileClientConfig> {
             config.setDomain(buildDomain());
         }
 
-        if (Boolean.TRUE.equals(config.getEnablePathStyleAccess())) {
-            return StrUtil.removeSuffix(config.getDomain(), StrUtil.format("/{}", config.getBucket()));
+        return normalizePresignerEndpoint(config.getDomain(), config.getBucket(),
+                config.getEnablePathStyleAccess());
+    }
+
+    /**
+     * 预签名 endpoint 只应包含 S3 服务地址，不能包含 path-style URL 末尾的 bucket。
+     * 否则 SDK 会再次追加 bucket，导致 PUT 实际写入的对象键与业务保存的 path 不一致。
+     */
+    static String normalizePresignerEndpoint(String domain, String bucket, Boolean pathStyleAccess) {
+        String endpoint = StrUtil.removeSuffix(domain, StrUtil.SLASH);
+        endpoint = StrUtil.removeSuffix(endpoint, StrUtil.SLASH + bucket);
+
+        if (Boolean.TRUE.equals(pathStyleAccess)) {
+            return endpoint;
         }
-        return StrUtil.replace(config.getDomain(), StrUtil.format("://{}.", config.getBucket()), "://");
+        return StrUtil.replace(endpoint, StrUtil.format("://{}.", bucket), "://");
     }
 
     /**

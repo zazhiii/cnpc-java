@@ -19,7 +19,7 @@ public class ImageImportProperties {
     private Long maxExpandedBytes = 2L * 1024 * 1024 * 1024;
     private Integer maxEntries = 5000;
     private Integer maxCompressionRatio = 100;
-    private Long maxImageBytes = 60L * 1024 * 1024;
+    private Long maxImageBytes = 50L * 1024 * 1024;
     private Long maxPixelCount = 50_000_000L;
 
     @Data
@@ -28,4 +28,3 @@ public class ImageImportProperties {
         private Integer queueCapacity = 20;
     }
 }
-

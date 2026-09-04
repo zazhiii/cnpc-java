@@ -23,6 +23,8 @@ import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.*;
 @Service
 public class AppCollectionServiceImpl implements AppCollectionService {
     private static final int REQUIRED_PHOTO_COUNT = 6;
+    private static final String STATUS_PENDING_UPLOAD = "PENDING_UPLOAD";
+    private static final String STATUS_COMPLETED = "COMPLETED";
 
     @Resource private CollectionTaskMapper taskMapper;
     @Resource private CollectionPhotoMapper photoMapper;
@@ -47,6 +49,15 @@ public class AppCollectionServiceImpl implements AppCollectionService {
     @Override
     public List<AppCollectionVO.TaskResp> list(Long userId) {
         return taskMapper.selectListByUser(userId).stream().map(this::convert).toList();
+    }
+
+    @Override
+    public AppCollectionVO.StatisticsResp statistics(Long userId) {
+        AppCollectionVO.StatisticsResp resp = new AppCollectionVO.StatisticsResp();
+        resp.setTotalTaskCount(taskMapper.selectCountByUserAndStatus(userId, null));
+        resp.setPendingUploadTaskCount(taskMapper.selectCountByUserAndStatus(userId, STATUS_PENDING_UPLOAD));
+        resp.setCompletedTaskCount(taskMapper.selectCountByUserAndStatus(userId, STATUS_COMPLETED));
+        return resp;
     }
 
     @Override

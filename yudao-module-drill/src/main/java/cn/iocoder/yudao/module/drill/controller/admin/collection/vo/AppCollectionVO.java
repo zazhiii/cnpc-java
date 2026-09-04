@@ -33,6 +33,13 @@ public final class AppCollectionVO {
     }
 
     @Data
+    public static class StatisticsResp {
+        private Long totalTaskCount;
+        private Long pendingUploadTaskCount;
+        private Long completedTaskCount;
+    }
+
+    @Data
     public static class UploadReq {
         private MultipartFile file;
         @NotBlank private String photoType;

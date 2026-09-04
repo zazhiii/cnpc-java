@@ -23,7 +23,7 @@ import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.*;
 @Component
 public class ImageFileValidator {
 
-    public static final long MAX_FILE_SIZE = 30L * 1024 * 1024;
+    public static final long MAX_FILE_SIZE = 50L * 1024 * 1024;
     public static final long MAX_PIXEL_COUNT = 50_000_000L;
     private static final Set<String> ALLOWED_FORMATS = Set.of("jpeg", "jpg", "png", "webp");
 

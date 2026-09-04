@@ -35,6 +35,12 @@ public class AppCollectionController {
         return success(service.list(getLoginUserId()));
     }
 
+    @GetMapping("/statistics")
+    @Operation(summary = "查询当前采集员任务统计")
+    public CommonResult<AppCollectionVO.StatisticsResp> statistics() {
+        return success(service.statistics(getLoginUserId()));
+    }
+
     @GetMapping("/get")
     @Operation(summary = "查询任务详情")
     public CommonResult<AppCollectionVO.TaskResp> get(@RequestParam String clientId) {

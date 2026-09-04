@@ -20,4 +20,10 @@ public interface CollectionTaskMapper extends BaseMapperX<CollectionTaskDO> {
                 .eq(CollectionTaskDO::getCollectorUserId, userId)
                 .orderByDesc(CollectionTaskDO::getUpdateTime));
     }
+
+    default Long selectCountByUserAndStatus(Long userId, String status) {
+        return selectCount(new LambdaQueryWrapperX<CollectionTaskDO>()
+                .eq(CollectionTaskDO::getCollectorUserId, userId)
+                .eqIfPresent(CollectionTaskDO::getStatus, status));
+    }
 }

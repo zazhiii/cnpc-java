@@ -10,12 +10,12 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class ImageAssetPageReqVO extends PageParam {
 
-    private Long batchId;
-    private String keyword;
-    private String drillType;
-    private String sceneType;
-    private String wellType;
-    private String photoType;
-    private String bladeNo;
-    private String metadataStatus;
+    private Long batchId; // 批次ID
+    private String keyword; // 关键词
+    private String drillType; // 钻探类型
+    private String sceneType; // 场景类型
+    private String wellType; // 井类型
+    private String photoType; // 照片类型
+    private String bladeNo; // 刀片编号
+    private String metadataStatus; // 元数据补录状态
 }
