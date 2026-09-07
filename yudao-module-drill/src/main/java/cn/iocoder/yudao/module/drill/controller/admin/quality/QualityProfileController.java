@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.module.drill.controller.admin.quality.vo.QualityProfileVO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.quality.QualityProfileDO;
 import cn.iocoder.yudao.module.drill.service.quality.QualityProfileService;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
@@ -41,12 +42,14 @@ public class QualityProfileController {
 
     @PostMapping("/create")
     @PreAuthorize("@ss.hasPermission('drill:quality-profile:manage')")
+    @Operation(summary = "创建质检方案")
     public CommonResult<Long> create(@Valid @RequestBody QualityProfileVO.SaveReq req) {
         return success(service.create(req));
     }
 
     @PutMapping("/update")
     @PreAuthorize("@ss.hasPermission('drill:quality-profile:manage')")
+    @Operation(summary = "更新质检方案")
     public CommonResult<Boolean> update(@Valid @RequestBody QualityProfileVO.SaveReq req) {
         service.update(req);
         return success(true);
@@ -54,12 +57,14 @@ public class QualityProfileController {
 
     @PostMapping("/copy")
     @PreAuthorize("@ss.hasPermission('drill:quality-profile:manage')")
+    @Operation(summary = "复制质检方案")
     public CommonResult<Long> copy(@Valid @RequestBody QualityProfileVO.CopyReq req) {
         return success(service.copy(req));
     }
 
     @PutMapping("/enable")
     @PreAuthorize("@ss.hasPermission('drill:quality-profile:manage')")
+    @Operation(summary = "启用质检方案")
     public CommonResult<Boolean> enable(@RequestParam Long id) {
         service.enable(id);
         return success(true);
@@ -67,6 +72,7 @@ public class QualityProfileController {
 
     @PutMapping("/disable")
     @PreAuthorize("@ss.hasPermission('drill:quality-profile:manage')")
+    @Operation(summary = "禁用质检方案")
     public CommonResult<Boolean> disable(@RequestParam Long id) {
         service.disable(id);
         return success(true);
@@ -74,6 +80,7 @@ public class QualityProfileController {
 
     @PutMapping("/set-default")
     @PreAuthorize("@ss.hasPermission('drill:quality-profile:manage')")
+    @Operation(summary = "设置默认质检方案")
     public CommonResult<Boolean> setDefault(@RequestParam Long id) {
         service.setDefault(id);
         return success(true);
@@ -81,6 +88,7 @@ public class QualityProfileController {
 
     @DeleteMapping("/delete")
     @PreAuthorize("@ss.hasPermission('drill:quality-profile:manage')")
+    @Operation(summary = "删除质检方案")
     public CommonResult<Boolean> delete(@RequestParam Long id) {
         service.delete(id);
         return success(true);
@@ -92,8 +100,8 @@ public class QualityProfileController {
         resp.setProfileCode(profile.getProfileCode());
         resp.setName(profile.getName());
         resp.setVersion(profile.getVersion());
-        resp.setModelCode(profile.getModelCode());
-        resp.setModelConfig(JsonUtils.parseMap(profile.getModelConfigJson()));
+        resp.setChecks(service.getChecks(profile.getId()));
+        resp.setShortCircuit(profile.getShortCircuit() == null || profile.getShortCircuit());
         resp.setStatus(profile.getStatus());
         resp.setDefaultProfile(profile.getDefaultProfile());
         resp.setEnabledAt(profile.getEnabledAt());

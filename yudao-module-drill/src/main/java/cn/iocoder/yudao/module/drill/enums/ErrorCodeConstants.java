@@ -79,5 +79,6 @@ public interface ErrorCodeConstants {
     ErrorCode QUALITY_CHECK_REQUEST_INVALID = new ErrorCode(1_050_000_088, "图片质检请求不合法：{}");
     ErrorCode QUALITY_RECORD_NOT_EXISTS = new ErrorCode(1_050_000_089, "图片质检记录不存在");
     ErrorCode QUALITY_MODEL_EXECUTION_FAILED = new ErrorCode(1_050_000_090, "图片质检模型执行失败");
+    ErrorCode QUALITY_CHECKER_UNSUPPORTED = new ErrorCode(1_050_000_091, "不支持的图片质检项：{}");
 
 }

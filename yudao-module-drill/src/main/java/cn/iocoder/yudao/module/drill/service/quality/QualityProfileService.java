@@ -10,6 +10,13 @@ public interface QualityProfileService {
     QualityProfileDO get(Long id);
     QualityProfileDO getEnabled(Long id);
     QualityProfileDO getDefaultEnabled();
+    List<QualityProfileVO.CheckItem> getChecks(Long profileId);
+
+    /**
+     * 创建质检方案
+     * @param req
+     * @return
+     */
     Long create(QualityProfileVO.SaveReq req);
     void update(QualityProfileVO.SaveReq req);
     Long copy(QualityProfileVO.CopyReq req);

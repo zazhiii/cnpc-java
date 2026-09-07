@@ -6,8 +6,9 @@ CREATE TABLE IF NOT EXISTS `drill_quality_profile` (
   `profile_code` varchar(64) NOT NULL,
   `name` varchar(100) NOT NULL,
   `version` varchar(32) NOT NULL,
-  `model_code` varchar(40) NOT NULL,
-  `model_config_json` json NOT NULL,
+  `model_code` varchar(40) DEFAULT NULL COMMENT '兼容旧版单模型方案',
+  `model_config_json` json DEFAULT NULL COMMENT '兼容旧版单模型方案',
+  `short_circuit` bit(1) NOT NULL DEFAULT b'1' COMMENT '任一条件不通过时是否终止后续质检',
   `status` varchar(24) NOT NULL,
   `default_profile` bit(1) NOT NULL DEFAULT b'0',
   `enabled_at` datetime DEFAULT NULL,
@@ -25,6 +26,25 @@ CREATE TABLE IF NOT EXISTS `drill_quality_profile` (
   UNIQUE KEY `uk_quality_profile_default` (`default_tenant_key`),
   KEY `idx_quality_profile_status` (`tenant_id`,`status`,`model_code`,`update_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='图片质检方案';
+
+CREATE TABLE IF NOT EXISTS `drill_quality_profile_item` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `profile_id` bigint NOT NULL,
+  `check_code` varchar(64) NOT NULL,
+  `config_json` json NOT NULL,
+  `sort_no` int NOT NULL DEFAULT 0,
+  `tenant_id` bigint NOT NULL DEFAULT 0,
+  `creator` varchar(64) DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  `active_check_code` varchar(64) GENERATED ALWAYS AS
+    (CASE WHEN `deleted` = b'0' THEN `check_code` ELSE NULL END) STORED,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_quality_profile_item` (`tenant_id`,`profile_id`,`active_check_code`),
+  KEY `idx_quality_profile_item_sort` (`tenant_id`,`profile_id`,`sort_no`,`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='图片质检方案检查项';
 
 CREATE TABLE IF NOT EXISTS `drill_image_quality_record` (
   `id` bigint NOT NULL AUTO_INCREMENT,
@@ -77,6 +97,20 @@ WHERE tenant.`deleted` = b'0' AND tenant.`status` = 0
       AND profile.`profile_code` = 'E11_STANDARD'
       AND profile.`version` = '1.0.0'
       AND profile.`deleted` = b'0'
+  );
+
+-- 将预置的旧版 E11 单模型方案同步为统一 Checker 明细。
+INSERT INTO `drill_quality_profile_item`
+(`profile_id`,`check_code`,`config_json`,`sort_no`,`tenant_id`)
+SELECT profile.`id`,'E11_MODEL',profile.`model_config_json`,10,profile.`tenant_id`
+FROM `drill_quality_profile` profile
+WHERE profile.`model_code` = 'E11' AND profile.`deleted` = b'0'
+  AND NOT EXISTS (
+    SELECT 1 FROM `drill_quality_profile_item` item
+    WHERE item.`tenant_id` = profile.`tenant_id`
+      AND item.`profile_id` = profile.`id`
+      AND item.`check_code` = 'E11_MODEL'
+      AND item.`deleted` = b'0'
   );
 
 -- 图片质检管理端菜单。菜单使用动态 ID，避免与不同环境已有菜单编号冲突。

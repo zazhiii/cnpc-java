@@ -18,8 +18,7 @@ public class QualityProfileDO extends TenantBaseDO {
     private String profileCode;
     private String name;
     private String version;
-    private String modelCode;
-    private String modelConfigJson;
+    private Boolean shortCircuit;
     private String status;
     private Boolean defaultProfile;
     private LocalDateTime enabledAt;

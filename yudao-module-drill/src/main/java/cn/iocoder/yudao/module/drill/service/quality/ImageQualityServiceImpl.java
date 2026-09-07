@@ -53,13 +53,14 @@ public class ImageQualityServiceImpl implements ImageQualityService {
         // 获取质检方案
         QualityProfileDO profile = reqVO.getProfileId() == null
                 ? profileService.getDefaultEnabled() : profileService.getEnabled(reqVO.getProfileId());
-        ImageQualityModelExecutor executor = modelRegistry.getRequired(profile.getModelCode());
+//        ImageQualityModelExecutor executor = modelRegistry.getRequired(profile.getModelCode());
         Map<String, Object> effectiveConfig = effectiveConfig(profile, reqVO);
-        executor.validateConfig(effectiveConfig);
-        executor.checkAvailability();
+//        executor.validateConfig(effectiveConfig);
+//        executor.checkAvailability();
 
         // 获取图片
-        Map<Long, ImageAssetDO> assets = imageAssetService.getAssets(assetIds).stream()
+        Map<Long, ImageAssetDO> assets = imageAssetService.getAssets(assetIds)
+                .stream()
                 .collect(Collectors.toMap(ImageAssetDO::getId, Function.identity()));
         if (assets.size() != assetIds.size()) {
             throw exception(IMAGE_ASSET_NOT_EXISTS);
@@ -68,7 +69,7 @@ public class ImageQualityServiceImpl implements ImageQualityService {
         // 质检并添加每一个质检结果
         List<ImageQualityCheckRespVO.Item> items = new ArrayList<>(assetIds.size());
         for (Long assetId : assetIds) {
-            items.add(e11ModelCheckOne(assets.get(assetId), profile, executor, effectiveConfig));
+//            items.add(e11ModelCheckOne(assets.get(assetId), profile, executor, effectiveConfig));
         }
 
         // 构建最终结果
@@ -133,23 +134,25 @@ public class ImageQualityServiceImpl implements ImageQualityService {
     }
 
     private Map<String, Object> effectiveConfig(QualityProfileDO profile, ImageQualityCheckReqVO reqVO) {
-        Map<String, Object> stored = JsonUtils.parseMap(profile.getModelConfigJson());
-        if (stored == null) {
-            throw exception(QUALITY_PROFILE_INVALID, "模型参数不是有效 JSON 对象");
-        }
-        Map<String, Object> config = new LinkedHashMap<>(stored);
-        if (reqVO.getConfidence() != null || reqVO.getMinDetections() != null) {
-            if (!MODEL_E11.equals(profile.getModelCode())) {
-                throw exception(QUALITY_CHECK_REQUEST_INVALID, "confidence 和 minDetections 仅适用于 E11 模型");
-            }
-            if (reqVO.getConfidence() != null) {
-                config.put("confidence", reqVO.getConfidence());
-            }
-            if (reqVO.getMinDetections() != null) {
-                config.put("minDetections", reqVO.getMinDetections());
-            }
-        }
-        return Map.copyOf(config);
+//        Map<String, Object> stored = JsonUtils.parseMap(profile.getModelConfigJson());
+//        if (stored == null) {
+//            throw exception(QUALITY_PROFILE_INVALID, "模型参数不是有效 JSON 对象");
+//        }
+//        Map<String, Object> config = new LinkedHashMap<>(stored);
+//        if (reqVO.getConfidence() != null || reqVO.getMinDetections() != null) {
+//            if (!MODEL_E11.equals(profile.getModelCode())) {
+//                throw exception(QUALITY_CHECK_REQUEST_INVALID, "confidence 和 minDetections 仅适用于 E11 模型");
+//            }
+//            if (reqVO.getConfidence() != null) {
+//                config.put("confidence", reqVO.getConfidence());
+//            }
+//            if (reqVO.getMinDetections() != null) {
+//                config.put("minDetections", reqVO.getMinDetections());
+//            }
+//        }
+//        return Map.copyOf(config);
+
+        return null;
     }
 
     private void fillMetadata(ImageQualityCheckRespVO.Item item, ImageQualityRecordDO record,
@@ -159,7 +162,7 @@ public class ImageQualityServiceImpl implements ImageQualityService {
         item.setProfileId(profile.getId());
         item.setProfileCode(profile.getProfileCode());
         item.setProfileVersion(profile.getVersion());
-        item.setModelCode(profile.getModelCode());
+//        item.setModelCode(profile.getModelCode());
         item.setExecutionStatus(record.getExecutionStatus());
         item.setEffectiveConfig(effectiveConfig);
     }

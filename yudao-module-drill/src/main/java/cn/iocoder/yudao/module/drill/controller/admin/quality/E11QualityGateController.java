@@ -28,11 +28,11 @@ public class E11QualityGateController {
     @Resource
     private ImageQualityService imageQualityService;
 
-    @PostMapping(value = "/check", consumes = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "按图片资产执行质量检测")
-    public CommonResult<ImageQualityCheckRespVO> check(
-            @Valid @RequestBody ImageQualityCheckReqVO reqVO) {
-        return success(imageQualityService.check(reqVO));
-    }
+//    @PostMapping(value = "/check", consumes = MediaType.APPLICATION_JSON_VALUE)
+//    @Operation(summary = "按图片资产执行质量检测")
+//    public CommonResult<ImageQualityCheckRespVO> check(
+//            @Valid @RequestBody ImageQualityCheckReqVO reqVO) {
+//        return success(imageQualityService.check(reqVO));
+//    }
 
 }
