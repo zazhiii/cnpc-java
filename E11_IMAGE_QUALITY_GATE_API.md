@@ -89,11 +89,19 @@
 
 ## E11 运行配置
 
-先在 `e11_quality_gate_windows_20260804` 目录执行 `install.cmd`。模型文件和运行时路径仍由 `application.yaml` 的 `drill.e11-quality-gate` 配置：
+先在 `e11_quality_gate_windows_20260804` 目录执行 `install.cmd`，再运行 `e11-server.cmd`。FastAPI 启动时只加载一次模型并完成预热；Spring Boot 通过 HTTP 调用常驻服务，不再逐图片启动 Python。
 
-- `E11_GATE_PYTHON`：虚拟环境 Python 路径；
-- `E11_GATE_SCRIPT`：模型入口脚本；
-- `E11_GATE_MODEL`：E11 ONNX 模型；
-- `E11_GATE_DEVICE`：默认 `cpu`。
+- `E11_GATE_BASE_URL`：FastAPI 根地址，默认 `http://127.0.0.1:18081`；
+- `connect-timeout`：连接超时，默认 3 秒；
+- `timeout`：上传和推理读取超时，默认 30 秒；
+- `health-timeout`：readiness 超时，默认 2 秒；
+- `max-concurrent`：Java 调用端并发保护，默认 1；
+- `acquire-timeout`：Java 调用端排队超时，默认 5 秒。
 
-超时、并发数和排队时间继续使用服务端配置，不能通过质检方案修改。
+Python 服务使用 `E11_MODEL_PATH`、`E11_MODEL_SHA256`、`E11_DEVICE=cpu`、`E11_MAX_CONCURRENT`、`E11_ACQUIRE_TIMEOUT`、`E11_MAX_IMAGE_BYTES` 和 `E11_MAX_PIXEL_COUNT` 配置。模型服务未启动或模型加载失败不会阻止 Spring Boot 启动；E11 请求会返回服务不可用并生成失败记录。
+
+Python 服务接口：
+
+- `GET /health/live`：进程存活；
+- `GET /health/ready`：模型完整性校验、加载和预热均成功；
+- `POST /v1/e11/predict`：内部 multipart 推理接口，仅允许 JPEG、PNG、WebP。

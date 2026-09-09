@@ -39,7 +39,7 @@ class ImageQualityServiceImplTest {
     void setUp() {
         ReflectionTestUtils.setField(service, "profileService", profileService);
         ReflectionTestUtils.setField(service, "modelRegistry", registry);
-        ReflectionTestUtils.setField(service, "recordService", recordService);
+        ReflectionTestUtils.setField(service, "imageQualityRecordService", recordService);
         ReflectionTestUtils.setField(service, "imageAssetService", assetService);
         ReflectionTestUtils.setField(service, "imageFileValidator", validator);
     }

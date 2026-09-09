@@ -77,6 +77,18 @@ public class QualityProfileServiceImpl implements QualityProfileService {
         if (!items.isEmpty()) {
             return items.stream().map(this::toCheckItem).toList();
         }
+        QualityProfileDO profile = get(profileId);
+        if (MODEL_E11.equals(profile.getModelCode()) && StrUtil.isNotBlank(profile.getModelConfigJson())) {
+            QualityProfileVO.CheckItem legacy = new QualityProfileVO.CheckItem();
+            legacy.setCheckCode("E11_MODEL");
+            Map<String, Object> config = JsonUtils.parseMap(profile.getModelConfigJson());
+            if (config == null) {
+                throw exception(QUALITY_PROFILE_INVALID, "E11 参数不是有效 JSON 对象");
+            }
+            legacy.setConfig(config);
+            legacy.setSortNo(10);
+            return List.of(legacy);
+        }
         return List.of();
     }
 
@@ -123,8 +135,8 @@ public class QualityProfileServiceImpl implements QualityProfileService {
         target.setProfileCode(source.getProfileCode());
         target.setName(req.getName());
         target.setVersion(version);
-//        target.setModelCode(source.getModelCode());
-//        target.setModelConfigJson(source.getModelConfigJson());
+        target.setModelCode(source.getModelCode());
+        target.setModelConfigJson(source.getModelConfigJson());
         target.setShortCircuit(source.getShortCircuit());
         target.setStatus(PROFILE_DRAFT);
         target.setDefaultProfile(false);

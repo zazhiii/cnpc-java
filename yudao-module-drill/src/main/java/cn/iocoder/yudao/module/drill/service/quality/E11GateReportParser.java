@@ -21,18 +21,21 @@ final class E11GateReportParser {
         this.objectMapper = objectMapper;
     }
 
-    ImageQualityModelResult parse(String json, int exitCode, double requestedConfidence,
-                               int requestedMinDetections) {
+    ImageQualityModelResult parse(String json, double requestedConfidence,
+                                  int requestedMinDetections) {
         try {
             JsonNode root = objectMapper.readTree(json);
             if (root == null || !root.isObject()) {
                 throw invalid("根节点不是 JSON 对象");
             }
+            if (!"1.0".equals(requiredText(root, "schema_version"))) {
+                throw invalid("不支持的 schema_version");
+            }
+            if (!"cutting_tooth_instance_segmentation_quality_gate".equals(requiredText(root, "task"))) {
+                throw invalid("不支持的 task");
+            }
             ImageQualityModelResult result = new ImageQualityModelResult();
             boolean passed = requiredBoolean(root, "passed");
-            if (passed != (exitCode == 0)) {
-                throw invalid("passed 与进程退出码不一致");
-            }
             result.setPassed(passed);
             result.setReason(requiredText(root, "reason"));
             result.setModelVersion(requiredText(root, "model_version"));

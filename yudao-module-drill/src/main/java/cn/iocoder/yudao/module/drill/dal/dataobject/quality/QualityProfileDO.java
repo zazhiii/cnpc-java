@@ -18,6 +18,10 @@ public class QualityProfileDO extends TenantBaseDO {
     private String profileCode;
     private String name;
     private String version;
+    /** 兼容现有 E11 单模型接口和已落库方案。 */
+    private String modelCode;
+    /** 兼容现有 E11 单模型接口和已落库方案。 */
+    private String modelConfigJson;
     private Boolean shortCircuit;
     private String status;
     private Boolean defaultProfile;

@@ -17,7 +17,9 @@ class E11GateReportParserTest {
     void shouldParsePassedReport() {
         String json = """
                 {
+                  "schema_version":"1.0",
                   "model_version":"E11",
+                  "task":"cutting_tooth_instance_segmentation_quality_gate",
                   "passed":true,
                   "reason":"passed",
                   "threshold":0.75,
@@ -33,7 +35,7 @@ class E11GateReportParserTest {
                 }
                 """;
 
-        ImageQualityModelResult result = parser.parse(json, 0, 0.75, 1);
+        ImageQualityModelResult result = parser.parse(json, 0.75, 1);
 
         assertTrue(result.getPassed());
         assertEquals(1, result.getAcceptedCount());
@@ -46,7 +48,9 @@ class E11GateReportParserTest {
     void shouldTreatExitCodeTenAsNormalRejectedReport() {
         String json = """
                 {
+                  "schema_version":"1.0",
                   "model_version":"E11",
+                  "task":"cutting_tooth_instance_segmentation_quality_gate",
                   "passed":false,
                   "reason":"insufficient_detections_above_threshold",
                   "threshold":0.8,
@@ -61,28 +65,30 @@ class E11GateReportParserTest {
                 }
                 """;
 
-        ImageQualityModelResult result = parser.parse(json, 10, 0.8, 1);
+        ImageQualityModelResult result = parser.parse(json, 0.8, 1);
 
         assertFalse(result.getPassed());
         assertEquals(0, result.getAcceptedCount());
     }
 
     @Test
-    void shouldRejectInconsistentExitCode() {
+    void shouldRejectUnsupportedSchema() {
         String json = """
-                {"model_version":"E11","passed":false,"reason":"rejected","threshold":0.75,
+                {"schema_version":"2.0","task":"cutting_tooth_instance_segmentation_quality_gate",
+                 "model_version":"E11","passed":false,"reason":"rejected","threshold":0.75,
                  "min_detections":1,"accepted_count":0,"candidate_count":0,"rejection_counts":{},
                  "confidence_summary":{"minimum":null,"maximum":null,"mean":null},
                  "image":{"width":10,"height":10},"detections":[],"inference_speed_ms":{}}
                 """;
 
-        assertThrows(IllegalArgumentException.class, () -> parser.parse(json, 0, 0.75, 1));
+        assertThrows(IllegalArgumentException.class, () -> parser.parse(json, 0.75, 1));
     }
 
     @Test
     void shouldRejectMalformedPolygon() {
         String json = """
-                {"model_version":"E11","passed":true,"reason":"passed","threshold":0.75,
+                {"schema_version":"1.0","task":"cutting_tooth_instance_segmentation_quality_gate",
+                 "model_version":"E11","passed":true,"reason":"passed","threshold":0.75,
                  "min_detections":1,"accepted_count":1,"candidate_count":1,"rejection_counts":{},
                  "confidence_summary":{"minimum":0.9,"maximum":0.9,"mean":0.9},
                  "image":{"width":10,"height":10},
@@ -90,7 +96,7 @@ class E11GateReportParserTest {
                  "inference_speed_ms":{}}
                 """;
 
-        assertThrows(IllegalArgumentException.class, () -> parser.parse(json, 0, 0.75, 1));
+        assertThrows(IllegalArgumentException.class, () -> parser.parse(json, 0.75, 1));
     }
 
 }

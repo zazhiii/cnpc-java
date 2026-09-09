@@ -387,14 +387,13 @@ drill:
     max-image-bytes: 52428800
     max-pixel-count: 50000000
   e11-quality-gate:
-    # 运行 install.cmd 后会生成该 Python；生产环境建议通过环境变量配置绝对路径。
-    python-executable: ${E11_GATE_PYTHON:../e11_quality_gate_windows_20260804/.venv/Scripts/python.exe}
-    script-path: ${E11_GATE_SCRIPT:../e11_quality_gate_windows_20260804/e11_quality_gate.py}
-    model-path: ${E11_GATE_MODEL:../e11_quality_gate_windows_20260804/e11.onnx}
-    device: ${E11_GATE_DEVICE:cpu}
-    timeout: 2m
+    base-url: ${E11_GATE_BASE_URL:http://127.0.0.1:18081}
+    connect-timeout: 3s
+    timeout: 30s
+    health-timeout: 2s
     max-concurrent: 1
     acquire-timeout: 5s
+    max-response-bytes: 5242880
   image-enhance:
     executor:
       core-size: 2

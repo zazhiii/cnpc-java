@@ -94,7 +94,7 @@ public class ImageQualityRecordServiceImpl implements ImageQualityRecordService 
         record.setProfileId(profile.getId());
         record.setProfileCode(profile.getProfileCode());
         record.setProfileVersion(profile.getVersion());
-//        record.setModelCode(profile.getModelCode());
+        record.setModelCode(profile.getModelCode() == null ? MODEL_E11 : profile.getModelCode());
         record.setEffectiveConfigJson(JsonUtils.toJsonString(effectiveConfig));
         record.setStartedAt(startedAt);
         return record;

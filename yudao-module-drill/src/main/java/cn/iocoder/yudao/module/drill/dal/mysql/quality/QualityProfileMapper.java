@@ -25,7 +25,7 @@ public interface QualityProfileMapper extends BaseMapperX<QualityProfileDO> {
     default List<QualityProfileDO> selectList(String status, String modelCode) {
         return selectList(new LambdaQueryWrapperX<QualityProfileDO>()
                 .eqIfPresent(QualityProfileDO::getStatus, status)
-//                .eqIfPresent(QualityProfileDO::getModelCode, modelCode)
+                .eqIfPresent(QualityProfileDO::getModelCode, modelCode)
                 .orderByDesc(QualityProfileDO::getDefaultProfile)
                 .orderByDesc(QualityProfileDO::getId));
     }

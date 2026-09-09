@@ -15,7 +15,7 @@ import java.util.List;
 public class ImageQualityCheckReqVO {
 
     private Long assetId;
-//    @Size(max = 20, message = "一次最多质检 20 张图片")
+    @Size(max = 20, message = "一次最多质检 20 张图片")
     private List<Long> assetIds;
     private Long profileId;
 
