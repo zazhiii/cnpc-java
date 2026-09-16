@@ -1,10 +1,11 @@
 package cn.iocoder.yudao.module.drill.service.quality.checker;
 
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
-import cn.iocoder.yudao.module.drill.service.quality.E11QualityGateService;
+import cn.iocoder.yudao.module.drill.config.E11QualityGateProperties;
+import cn.iocoder.yudao.module.drill.service.quality.E11QualityGateHttpClient;
 import cn.iocoder.yudao.module.drill.service.quality.ImageQualityCheckResult;
-import cn.iocoder.yudao.module.drill.service.quality.model.ImageQualityModelResult;
 import cn.iocoder.yudao.module.drill.service.quality.model.QualityImageInput;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import javax.imageio.ImageIO;
@@ -20,26 +21,22 @@ import static org.mockito.Mockito.*;
 class ImageQualityCheckerTest {
 
     @Test
-    void e11ShouldDelegateAndMapModelResult() {
-        E11QualityGateService gate = mock(E11QualityGateService.class);
-        E11ModelQualityChecker checker = new E11ModelQualityChecker(gate);
+    void e11ShouldExecuteAndMapModelResult() {
+        E11QualityGateHttpClient client = mock(E11QualityGateHttpClient.class);
+        E11ModelQualityChecker checker = new E11ModelQualityChecker(
+                new E11QualityGateProperties(), client, new ObjectMapper());
         Map<String, Object> config = Map.of("confidence", 0.75D, "minDetections", 1);
         QualityImageInput input = input(solidImage(8, 8, Color.BLACK), 8, 8);
-        ImageQualityModelResult modelResult = new ImageQualityModelResult();
-        modelResult.setPassed(false);
-        modelResult.setReason("没有足够的有效检测");
-        modelResult.setModelVersion("E11-v1");
-        modelResult.setAcceptedCount(0);
-        when(gate.execute(input, config)).thenReturn(modelResult);
+        when(client.predict(eq(input), eq(0.75D), eq(1), anyString()))
+                .thenReturn(new E11QualityGateHttpClient.Response(200, rejectedReport()));
 
         ImageQualityCheckResult result = checker.check(input, config);
 
         assertEquals("E11_MODEL", result.getCheckCode());
         assertFalse(result.getPassed());
         assertEquals("MODEL_NO_DETECTION", result.getReasonCode());
-        assertEquals("E11-v1", result.getMetrics().get("modelVersion"));
-        verify(gate).validateConfig(config);
-        verify(gate).execute(input, config);
+        assertEquals("E11", result.getMetrics().get("modelVersion"));
+        verify(client).predict(eq(input), eq(0.75D), eq(1), anyString());
     }
 
     @Test
@@ -125,5 +122,26 @@ class ImageQualityCheckerTest {
         } catch (IOException ex) {
             throw new IllegalStateException(ex);
         }
+    }
+
+    private String rejectedReport() {
+        return """
+                {
+                  "schema_version":"1.0",
+                  "model_version":"E11",
+                  "task":"cutting_tooth_instance_segmentation_quality_gate",
+                  "passed":false,
+                  "reason":"insufficient_detections_above_threshold",
+                  "threshold":0.75,
+                  "min_detections":1,
+                  "accepted_count":0,
+                  "candidate_count":0,
+                  "rejection_counts":{"below_threshold":0,"invalid_polygon":0,"unexpected_label":0},
+                  "confidence_summary":{"minimum":null,"maximum":null,"mean":null},
+                  "image":{"width":8,"height":8},
+                  "detections":[],
+                  "inference_speed_ms":{}
+                }
+                """;
     }
 }

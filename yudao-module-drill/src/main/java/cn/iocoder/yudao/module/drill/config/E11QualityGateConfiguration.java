@@ -4,6 +4,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
@@ -11,6 +12,17 @@ import java.time.Duration;
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(E11QualityGateProperties.class)
 public class E11QualityGateConfiguration {
+
+    /**
+     * E11 registers two qualified RestTemplate instances, which makes the framework's
+     * ConditionalOnMissingBean RestTemplate back off. Keep a neutral primary instance
+     * for third-party components that inject RestTemplate by type.
+     */
+    @Bean
+    @Primary
+    public RestTemplate restTemplate(RestTemplateBuilder builder) {
+        return builder.build();
+    }
 
     @Bean("e11QualityGateRestTemplate")
     public RestTemplate e11QualityGateRestTemplate(RestTemplateBuilder builder,

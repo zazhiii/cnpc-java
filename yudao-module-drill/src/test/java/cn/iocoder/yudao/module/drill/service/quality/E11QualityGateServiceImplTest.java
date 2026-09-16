@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.drill.service.quality;
 
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.module.drill.config.E11QualityGateProperties;
+import cn.iocoder.yudao.module.drill.service.quality.checker.E11ModelQualityChecker;
 import cn.iocoder.yudao.module.drill.service.quality.model.ImageQualityModelResult;
 import cn.iocoder.yudao.module.drill.service.quality.model.QualityImageInput;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,7 +24,8 @@ class E11QualityGateServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        service = new E11QualityGateServiceImpl(properties, client, new ObjectMapper());
+        service = new E11QualityGateServiceImpl(
+                new E11ModelQualityChecker(properties, client, new ObjectMapper()));
     }
 
     @Test

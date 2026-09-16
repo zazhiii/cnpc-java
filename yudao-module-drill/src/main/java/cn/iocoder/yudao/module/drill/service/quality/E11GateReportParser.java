@@ -11,18 +11,18 @@ import java.util.List;
 import java.util.Map;
 
 /** 将模型进程 JSON 转为对外响应，并校验模型契约。 */
-final class E11GateReportParser {
+public final class E11GateReportParser {
 
     private static final String EXPECTED_LABEL = "CUTTING_TOOTH";
 
     private final ObjectMapper objectMapper;
 
-    E11GateReportParser(ObjectMapper objectMapper) {
+    public E11GateReportParser(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
-    ImageQualityModelResult parse(String json, double requestedConfidence,
-                                  int requestedMinDetections) {
+    public ImageQualityModelResult parse(String json, double requestedConfidence,
+                                         int requestedMinDetections) {
         try {
             JsonNode root = objectMapper.readTree(json);
             if (root == null || !root.isObject()) {

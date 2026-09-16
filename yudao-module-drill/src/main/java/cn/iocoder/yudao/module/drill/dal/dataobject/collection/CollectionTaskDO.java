@@ -7,6 +7,8 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.math.BigDecimal;
 
 @TableName("drill_collection_task")
 @KeySequence("drill_collection_task_seq")
@@ -18,6 +20,21 @@ public class CollectionTaskDO extends TenantBaseDO {
     private String taskNo;
     private String taskType;
     private String status;
+    private String drillCode;
+    private String drillType;
+    private String drillModel;
+    private String drillSize;
+    private String manufacturer;
+    private String productionBatch;
+    private String wellNumber;
+    private String wellSection;
+    private String formation;
+    private LocalDate operationTime;
+    private BigDecimal footage;
+    private BigDecimal drillingHours;
+    private String location;
+    private String notes;
+    private Integer version;
     private String taskJson;
     private String resultJson;
     private Long collectorUserId;

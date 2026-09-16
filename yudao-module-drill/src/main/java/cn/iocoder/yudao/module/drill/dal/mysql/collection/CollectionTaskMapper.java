@@ -2,6 +2,8 @@ package cn.iocoder.yudao.module.drill.dal.mysql.collection;
 
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.module.drill.controller.admin.collection.vo.AppCollectionTaskVO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.collection.CollectionTaskDO;
 import org.apache.ibatis.annotations.Mapper;
 
@@ -25,5 +27,16 @@ public interface CollectionTaskMapper extends BaseMapperX<CollectionTaskDO> {
         return selectCount(new LambdaQueryWrapperX<CollectionTaskDO>()
                 .eq(CollectionTaskDO::getCollectorUserId, userId)
                 .eqIfPresent(CollectionTaskDO::getStatus, status));
+    }
+
+    default PageResult<CollectionTaskDO> selectPage(Long userId, AppCollectionTaskVO.PageReq req) {
+        return selectPage(req, new LambdaQueryWrapperX<CollectionTaskDO>()
+                .eq(CollectionTaskDO::getCollectorUserId, userId)
+                .eqIfPresent(CollectionTaskDO::getStatus, req.getStatus())
+                .and(req.getKeyword() != null && !req.getKeyword().isBlank(), query -> query
+                        .like(CollectionTaskDO::getTaskNo, req.getKeyword())
+                        .or().like(CollectionTaskDO::getDrillCode, req.getKeyword())
+                        .or().like(CollectionTaskDO::getWellNumber, req.getKeyword()))
+                .orderByDesc(CollectionTaskDO::getUpdateTime));
     }
 }

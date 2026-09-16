@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.drill.controller.admin.collection.vo;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -43,7 +44,9 @@ public final class AppCollectionVO {
     public static class UploadReq {
         private MultipartFile file;
         @NotBlank private String photoType;
-        @NotBlank private String photoState;
+        @NotBlank
+        @Pattern(regexp = "PASSED|WARNING", message = "照片状态必须是 PASSED 或 WARNING")
+        private String photoState;
         private String auditRegionJson;
         private String auditReportJson;
     }
@@ -56,5 +59,16 @@ public final class AppCollectionVO {
         private String fileUrl;
         private String auditRegionJson;
         private String auditReportJson;
+    }
+
+    @Data
+    public static class PhotoQualityResp {
+        private Boolean passed;
+        private String reason;
+        private String modelVersion;
+        private Double threshold;
+        private Integer acceptedCount;
+        private Integer candidateCount;
+        private Long durationMs;
     }
 }

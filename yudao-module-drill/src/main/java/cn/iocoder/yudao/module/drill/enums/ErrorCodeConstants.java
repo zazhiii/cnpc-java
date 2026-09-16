@@ -57,6 +57,13 @@ public interface ErrorCodeConstants {
     ErrorCode APP_COLLECTION_PHOTO_EMPTY = new ErrorCode(1_050_000_061, "采集照片不能为空或无法读取");
     ErrorCode APP_COLLECTION_INCOMPLETE = new ErrorCode(1_050_000_062,
             "必拍照片未完成，当前 {} 张，至少需要 {} 张");
+    ErrorCode APP_COLLECTION_TASK_NOT_DRAFT = new ErrorCode(1_050_000_063, "只有草稿任务可以修改");
+    ErrorCode APP_COLLECTION_TASK_DELETE_FORBIDDEN = new ErrorCode(1_050_000_064, "只有草稿任务可以删除");
+    ErrorCode APP_COLLECTION_TASK_VERSION_CONFLICT = new ErrorCode(1_050_000_065, "任务已在其他设备更新，请处理同步冲突");
+    ErrorCode APP_COLLECTION_CAPTURE_NOT_EXISTS = new ErrorCode(1_050_000_066, "任务拍摄项不存在");
+    ErrorCode APP_COLLECTION_IDEMPOTENCY_CONFLICT = new ErrorCode(1_050_000_068, "clientId 已被不同任务使用");
+    ErrorCode APP_COLLECTION_SYNC_CURSOR_INVALID = new ErrorCode(1_050_000_069, "同步游标无效");
+    ErrorCode APP_COLLECTION_TASK_FORBIDDEN = new ErrorCode(1_050_000_070, "无权访问该采集任务");
 
     ErrorCode E11_QUALITY_GATE_UNAVAILABLE = new ErrorCode(1_050_000_070,
             "E11 图片质量检测服务不可用，请检查模型配置");

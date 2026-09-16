@@ -21,5 +21,8 @@ public class E11QualityGateProperties {
     private Integer maxConcurrent = 1;
     private Duration acquireTimeout = Duration.ofSeconds(5);
     private Integer maxResponseBytes = 5 * 1024 * 1024;
+    /** App 拍照即质检使用固定单模型参数，不依赖管理端质检方案表。 */
+    private Double appConfidence = 0.75D;
+    private Integer appMinDetections = 1;
 
 }

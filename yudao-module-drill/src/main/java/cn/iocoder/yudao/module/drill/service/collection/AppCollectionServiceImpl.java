@@ -2,10 +2,11 @@ package cn.iocoder.yudao.module.drill.service.collection;
 
 import cn.hutool.core.io.IoUtil;
 import cn.hutool.core.util.StrUtil;
-import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.module.drill.controller.admin.collection.vo.AppCollectionVO;
+import cn.iocoder.yudao.module.drill.dal.dataobject.collection.CollectionCaptureDO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.collection.CollectionPhotoDO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.collection.CollectionTaskDO;
+import cn.iocoder.yudao.module.drill.dal.mysql.collection.CollectionCaptureMapper;
 import cn.iocoder.yudao.module.drill.dal.mysql.collection.CollectionPhotoMapper;
 import cn.iocoder.yudao.module.drill.dal.mysql.collection.CollectionTaskMapper;
 import cn.iocoder.yudao.module.infra.service.file.FileService;
@@ -16,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.*;
@@ -28,6 +31,7 @@ public class AppCollectionServiceImpl implements AppCollectionService {
 
     @Resource private CollectionTaskMapper taskMapper;
     @Resource private CollectionPhotoMapper photoMapper;
+    @Resource private CollectionCaptureMapper captureMapper;
     @Resource private FileService fileService;
 
     @Override
@@ -104,24 +108,36 @@ public class AppCollectionServiceImpl implements AppCollectionService {
     @Transactional(rollbackFor = Exception.class)
     public AppCollectionVO.TaskResp submit(Long userId, String clientId) {
         CollectionTaskDO task = requireTask(userId, clientId);
+        if (STATUS_COMPLETED.equals(task.getStatus())) return convert(task);
         List<CollectionPhotoDO> photos = photoMapper.selectListByTask(task.getId());
-        long usable = photos.stream().filter(photo -> !"FAILED".equals(photo.getPhotoState())).count();
-        if (usable < REQUIRED_PHOTO_COUNT) {
-            throw exception(APP_COLLECTION_INCOMPLETE, usable, REQUIRED_PHOTO_COUNT);
+        List<CollectionCaptureDO> required = captureMapper.selectByTaskId(task.getId()).stream()
+                .filter(capture -> Boolean.TRUE.equals(capture.getRequiredFlag())).toList();
+        long usable;
+        int requiredCount;
+        if (required.isEmpty()) {
+            // 兼容尚未生成动态拍摄清单的旧任务。
+            requiredCount = REQUIRED_PHOTO_COUNT;
+            usable = photos.stream().filter(photo -> isUsable(photo.getPhotoState())).count();
+        } else {
+            requiredCount = required.size();
+            Map<String, CollectionPhotoDO> byCapture = photos.stream().collect(Collectors.toMap(
+                    CollectionPhotoDO::getCaptureId, Function.identity(), (first, last) -> last));
+            usable = required.stream().filter(capture -> {
+                CollectionPhotoDO photo = byCapture.get(capture.getCaptureCode());
+                return photo != null && isUsable(photo.getPhotoState());
+            }).count();
         }
-        Map<String, Object> result = Map.of(
-                "wearType", "切削齿磨圆",
-                "severity", "中度",
-                "location", "待专业复核定位",
-                "confidence", 80,
-                "qualityGrade", "B",
-                "modelVersion", "SERVER-DEMO-1.0",
-                "advice", "当前为接口联调演示结果，接入正式磨损识别模型后替换");
-        task.setStatus("COMPLETED");
-        task.setResultJson(JsonUtils.toJsonString(result));
+        if (usable < requiredCount) {
+            throw exception(APP_COLLECTION_INCOMPLETE, usable, requiredCount);
+        }
+        task.setStatus(STATUS_COMPLETED);
         task.setSubmitTime(LocalDateTime.now());
         taskMapper.updateById(task);
         return convert(task);
+    }
+
+    private boolean isUsable(String photoState) {
+        return "PASSED".equals(photoState) || "WARNING".equals(photoState);
     }
 
     private CollectionTaskDO requireTask(Long userId, String clientId) {
