@@ -23,11 +23,12 @@ import java.util.Map;
 import java.util.Objects;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.iocoder.yudao.module.drill.controller.android.enums.TaskStatus.DRAFT;
 import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.*;
 
 @Service
 public class AppCollectionTaskServiceImpl implements AppCollectionTaskService {
-    private static final String DRAFT = "DRAFT";
+//    private static final String DRAFT = "DRAFT";
     private static final String PENDING_QUALITY = "PENDING_QUALITY";
     private static final String COMPLETED = "COMPLETED";
     private static final int SYNC_LIMIT = 100;
@@ -58,7 +59,7 @@ public class AppCollectionTaskServiceImpl implements AppCollectionTaskService {
                 .setClientId(req.getClientId())
                 .setTaskNo("PENDING-" + req.getClientId())
                 .setTaskType(req.getTaskType())
-                .setStatus(DRAFT)
+                .setStatus(DRAFT.getCode())
                 .setVersion(1)
                 .setCollectorUserId(userId);
         copy(req.getDrillBit(), req.getOperation(), task);

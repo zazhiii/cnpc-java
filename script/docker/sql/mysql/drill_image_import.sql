@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS `drill_image_batch` (
   `batch_no` varchar(40) NOT NULL COMMENT '批次业务编号',
   `name` varchar(100) NOT NULL COMMENT '批次名称',
   `source_type` varchar(32) NOT NULL COMMENT '来源类型：LOCAL_UPLOAD、PRESIGNED_UPLOAD、MINIO_OBJECT 等',
---   `project_id` bigint DEFAULT NULL COMMENT '项目编号',
+  `project_id` bigint DEFAULT NULL COMMENT '项目编号',
   `scene_type` varchar(32) DEFAULT NULL COMMENT '场景：IN_HOLE、OUT_HOLE、HISTORY、OTHER',
   `status` varchar(32) NOT NULL COMMENT '导入状态：IMPORTING、READY、PARTIAL_READY、FAILED、ARCHIVED',
   `total_count` int NOT NULL DEFAULT 0 COMMENT '文件总数',

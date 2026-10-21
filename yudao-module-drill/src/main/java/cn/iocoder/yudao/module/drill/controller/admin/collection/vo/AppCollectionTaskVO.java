@@ -41,7 +41,7 @@ public final class AppCollectionTaskVO {
     @Data
     public static class CreateReq {
         @NotBlank @Size(max = 64) private String clientId;
-        @NotBlank @Pattern(regexp = "RUN_IN|PULL_OUT") private String taskType;
+        @NotBlank() @Pattern(regexp = "RUN_IN|PULL_OUT") private String taskType;
         @Valid @NotNull private DrillBit drillBit;
         @Valid @NotNull private Operation operation;
         @NotNull @Min(1) @Max(64) private Integer bladeCount;
@@ -71,7 +71,9 @@ public final class AppCollectionTaskVO {
     public static class Resp {
         private Long id;
         private String clientId;
+        // 任务编号
         private String taskNo;
+        // 任务类型：入井、出井
         private String taskType;
         private String status;
         private Integer version;

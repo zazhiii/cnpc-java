@@ -324,7 +324,7 @@ yudao:
     unit-test-enable: false # 是否生成单元测试
     import-enable: false # 是否生成 Excel 导入接口
   tenant: # 多租户相关配置项
-    enable: true
+    enable: false
     ignore-urls:
       - /jmreport/* # 积木报表，无法携带租户编号
     ignore-visit-urls:
@@ -387,7 +387,7 @@ drill:
     max-image-bytes: 52428800
     max-pixel-count: 50000000
   e11-quality-gate:
-    base-url: ${E11_GATE_BASE_URL:http://127.0.0.1:18081}
+    base-url: ${E11_GATE_BASE_URL:http://192.77.108.247:18081}
     connect-timeout: 3s
     timeout: 30s
     health-timeout: 2s
