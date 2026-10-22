@@ -26,9 +26,10 @@ import org.springframework.mock.web.MockMultipartFile;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.APP_COLLECTION_TASK_VERSION_CONFLICT;
 import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.APP_COLLECTION_IDEMPOTENCY_CONFLICT;
 import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.APP_COLLECTION_INCOMPLETE;
+import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.APP_COLLECTION_TASK_FORBIDDEN;
+import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.APP_COLLECTION_TASK_NOT_DRAFT;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -140,20 +141,63 @@ class AppCollectionTaskServiceImplTest {
     }
 
     @Test
-    void updateShouldReportOptimisticLockConflict() {
+    void updateShouldUseTaskFormAndPhotoItemTables() {
         AppCollectionTaskVO.UpdateReq request = new AppCollectionTaskVO.UpdateReq();
         request.setVersion(1);
         request.setDrillBit(request("x").getDrillBit());
+        request.getDrillBit().setCode("PDC-UPDATED");
         request.setOperation(request("x").getOperation());
         request.setBladeCount(1);
-        when(taskMapper.update(any(), any())).thenReturn(0);
-        when(taskMapper.selectById(7L)).thenReturn(task(7L, "x", 2));
+        CollectionTaskEntity task = taskEntity(7L, "x");
+        CollectionTaskFormEntity form = taskFormEntity(7L).setId(31L);
+        CollectionTaskPhotoItemEntity overall = photoItem(7L, "OVERALL", null).setId(41L);
+        CollectionTaskPhotoItemEntity blade1 = photoItem(7L, "BLADE", 1).setId(42L)
+                .setStatus("PASSED");
+        CollectionTaskPhotoItemEntity blade2 = photoItem(7L, "BLADE", 2).setId(43L);
+        when(taskEntityMapper.selectByIdForUpdate(7L)).thenReturn(task);
+        when(taskFormEntityMapper.selectByTaskId(7L)).thenReturn(form);
+        when(taskPhotoItemEntityMapper.selectListByTaskId(7L))
+                .thenReturn(List.of(overall, blade1, blade2));
+
+        AppCollectionTaskVO.Resp result = service.updateDraft(9L, 7L, request);
+
+        assertEquals("PDC-UPDATED", result.getDrillBit().getCode());
+        assertEquals(2, result.getCaptures().size());
+        assertEquals("PASSED", result.getCaptures().get(1).getState());
+        assertEquals(1, result.getVersion());
+        verify(taskFormEntityMapper).updateById(org.mockito.ArgumentMatchers
+                .<CollectionTaskFormEntity>argThat(item -> "PDC-UPDATED".equals(item.getDrillCode())));
+        verify(taskPhotoItemEntityMapper).updateById(overall);
+        verify(taskPhotoItemEntityMapper).updateById(blade1);
+        verify(taskPhotoItemEntityMapper).deleteById(43L);
+        verify(taskEntityMapper).updateById(task);
+        verifyNoInteractions(taskMapper, changeMapper);
+    }
+
+    @Test
+    void updateShouldRejectAnotherUsersTask() {
+        AppCollectionTaskVO.UpdateReq request = updateRequest();
+        when(taskEntityMapper.selectByIdForUpdate(7L))
+                .thenReturn(taskEntity(7L, "x").setUserId(10L));
 
         ServiceException error = assertThrows(ServiceException.class,
                 () -> service.updateDraft(9L, 7L, request));
 
-        assertEquals(APP_COLLECTION_TASK_VERSION_CONFLICT.getCode(), error.getCode());
-        verify(changeMapper, never()).insert(any(CollectionTaskChangeDO.class));
+        assertEquals(APP_COLLECTION_TASK_FORBIDDEN.getCode(), error.getCode());
+        verifyNoInteractions(taskFormEntityMapper, taskPhotoItemEntityMapper);
+    }
+
+    @Test
+    void updateShouldRejectNonDraftTask() {
+        AppCollectionTaskVO.UpdateReq request = updateRequest();
+        when(taskEntityMapper.selectByIdForUpdate(7L))
+                .thenReturn(taskEntity(7L, "x").setStatus("COMPLETED"));
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.updateDraft(9L, 7L, request));
+
+        assertEquals(APP_COLLECTION_TASK_NOT_DRAFT.getCode(), error.getCode());
+        verifyNoInteractions(taskFormEntityMapper, taskPhotoItemEntityMapper);
     }
 
     @Test
@@ -264,6 +308,15 @@ class AppCollectionTaskServiceImplTest {
         request.setTaskType("PULL_OUT");
         request.setDrillBit(drill);
         request.setOperation(operation);
+        request.setBladeCount(1);
+        return request;
+    }
+
+    private static AppCollectionTaskVO.UpdateReq updateRequest() {
+        AppCollectionTaskVO.UpdateReq request = new AppCollectionTaskVO.UpdateReq();
+        request.setVersion(1);
+        request.setDrillBit(request("update").getDrillBit());
+        request.setOperation(request("update").getOperation());
         request.setBladeCount(1);
         return request;
     }

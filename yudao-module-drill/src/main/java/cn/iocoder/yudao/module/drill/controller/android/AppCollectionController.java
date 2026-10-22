@@ -34,8 +34,7 @@ public class AppCollectionController {
 
     @PostMapping(value = "/photos/quality-check", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "临时检测照片中是否存在钻头切削齿，不保存为任务照片")
-    public CommonResult<AppCollectionVO.PhotoQualityResp> checkPhotoQuality(
-            @RequestPart("file") MultipartFile file) {
+    public CommonResult<AppCollectionVO.PhotoQualityResp> checkPhotoQuality(@RequestPart("file") MultipartFile file) {
         return success(photoQualityService.check(file));
     }
 

@@ -102,25 +102,31 @@ public class AppCollectionTaskServiceImpl implements AppCollectionTaskService {
     }
 
     @Override
+    @TenantIgnore
     @Transactional(rollbackFor = Exception.class)
     public AppCollectionTaskVO.Resp updateDraft(Long userId, Long id, AppCollectionTaskVO.UpdateReq req) {
-        CollectionTaskDO update = new CollectionTaskDO();
-        copy(req.getDrillBit(), req.getOperation(), update);
-        int updated = taskMapper.update(update, new LambdaUpdateWrapper<CollectionTaskDO>()
-                .eq(CollectionTaskDO::getId, id)
-                .eq(CollectionTaskDO::getCollectorUserId, userId)
-                .eq(CollectionTaskDO::getStatus, DRAFT.getCode())
-                .eq(CollectionTaskDO::getVersion, req.getVersion())
-                .setSql("version = version + 1"));
-        if (updated == 0) {
-            CollectionTaskDO current = requireTask(userId, id);
-            if (!DRAFT.getCode().equals(current.getStatus())) throw exception(APP_COLLECTION_TASK_NOT_DRAFT);
-            throw exception(APP_COLLECTION_TASK_VERSION_CONFLICT);
+        // 判断采集任务是否存在
+        CollectionTaskEntity task = taskEntityMapper.selectByIdForUpdate(id);
+        if (task == null) throw exception(APP_COLLECTION_TASK_NOT_EXISTS);
+        // 判断是否是当前用户的任务
+        if (!Objects.equals(task.getUserId(), userId)) throw exception(APP_COLLECTION_TASK_FORBIDDEN);
+        if (!DRAFT.getCode().equals(task.getStatus())) throw exception(APP_COLLECTION_TASK_NOT_DRAFT);
+
+        CollectionTaskFormEntity form = taskFormEntityMapper.selectByTaskId(id);
+        if (form == null) {
+            form = buildTaskForm(id, req.getDrillBit(), req.getOperation());
+            taskFormEntityMapper.insert(form);
+        } else {
+            fillTaskForm(form, req.getDrillBit(), req.getOperation());
+            form.setUpdateTime(LocalDateTime.now());
+            taskFormEntityMapper.updateById(form);
         }
-        CollectionTaskDO task = requireTask(userId, id);
-        replaceDynamicCaptures(task.getId(), req.getBladeCount());
-        recordChange(task, "UPSERT");
-        return convert(task);
+        List<CollectionTaskPhotoItemEntity> photoItems = replacePhotoItems(id, req.getBladeCount());
+
+        // 主表本身没有可变的业务字段；显式刷新 update_time，作为任务级最后修改时间。
+        task.setUpdateTime(LocalDateTime.now());
+        taskEntityMapper.updateById(task);
+        return convertCreatedTask(task, form, photoItems);
     }
 
     @Override
@@ -325,10 +331,18 @@ public class AppCollectionTaskServiceImpl implements AppCollectionTaskService {
     }
 
     private CollectionTaskFormEntity buildTaskForm(Long taskId, AppCollectionTaskVO.CreateReq req) {
-        AppCollectionTaskVO.DrillBit drill = req.getDrillBit();
-        AppCollectionTaskVO.Operation operation = req.getOperation();
-        return new CollectionTaskFormEntity()
-                .setTaskId(taskId)
+        return buildTaskForm(taskId, req.getDrillBit(), req.getOperation());
+    }
+
+    private CollectionTaskFormEntity buildTaskForm(Long taskId, AppCollectionTaskVO.DrillBit drill,
+                                                   AppCollectionTaskVO.Operation operation) {
+        return fillTaskForm(new CollectionTaskFormEntity().setTaskId(taskId), drill, operation);
+    }
+
+    private CollectionTaskFormEntity fillTaskForm(CollectionTaskFormEntity form,
+                                                  AppCollectionTaskVO.DrillBit drill,
+                                                  AppCollectionTaskVO.Operation operation) {
+        return form
                 .setDrillCode(drill.getCode())
                 .setDrillType(drill.getType())
                 .setDrillModel(drill.getModel())
@@ -369,6 +383,49 @@ public class AppCollectionTaskServiceImpl implements AppCollectionTaskService {
             items.add(blade);
         }
         return items;
+    }
+
+    private List<CollectionTaskPhotoItemEntity> replacePhotoItems(Long taskId, int bladeCount) {
+        List<CollectionTaskPhotoItemEntity> existing = taskPhotoItemEntityMapper.selectListByTaskId(taskId);
+        CollectionTaskPhotoItemEntity overall = null;
+        Map<Integer, CollectionTaskPhotoItemEntity> blades = new HashMap<>();
+        List<CollectionTaskPhotoItemEntity> obsolete = new ArrayList<>();
+        for (CollectionTaskPhotoItemEntity item : existing) {
+            if (overall == null && "OVERALL".equals(item.getPhotoType()) && item.getBladeNo() == null) {
+                overall = item;
+            } else if ("BLADE".equals(item.getPhotoType()) && item.getBladeNo() != null
+                    && !blades.containsKey(item.getBladeNo())) {
+                blades.put(item.getBladeNo(), item);
+            } else {
+                obsolete.add(item);
+            }
+        }
+
+        List<CollectionTaskPhotoItemEntity> result = new ArrayList<>(bladeCount + 1);
+        result.add(upsertPhotoItem(overall, taskId, "OVERALL", "钻头全局图", null, 1));
+        for (int bladeNo = 1; bladeNo <= bladeCount; bladeNo++) {
+            result.add(upsertPhotoItem(blades.remove(bladeNo), taskId, "BLADE",
+                    bladeNo + "号刀翼", bladeNo, bladeNo + 1));
+        }
+        obsolete.addAll(blades.values());
+        obsolete.forEach(item -> taskPhotoItemEntityMapper.deleteById(item.getId()));
+        return result;
+    }
+
+    private CollectionTaskPhotoItemEntity upsertPhotoItem(CollectionTaskPhotoItemEntity current,
+                                                          Long taskId, String photoType, String title,
+                                                          Integer bladeNo, int sortNo) {
+        CollectionTaskPhotoItemEntity item = current == null
+                ? new CollectionTaskPhotoItemEntity().setTaskId(taskId).setStatus("PENDING")
+                : current;
+        item.setPhotoType(photoType);
+        item.setTitle(title);
+        item.setRequiredFlag(true);
+        item.setBladeNo(bladeNo);
+        item.setSortNo(sortNo);
+        if (item.getId() == null) taskPhotoItemEntityMapper.insert(item);
+        else taskPhotoItemEntityMapper.updateById(item);
+        return item;
     }
 
     private AppCollectionTaskVO.Resp convertCreatedTask(CollectionTaskEntity task,
@@ -424,24 +481,6 @@ public class AppCollectionTaskServiceImpl implements AppCollectionTaskService {
         return result;
     }
 
-    private void copy(AppCollectionTaskVO.DrillBit drill, AppCollectionTaskVO.Operation operation,
-                      CollectionTaskDO task) {
-        task.setDrillCode(drill.getCode());
-        task.setDrillType(drill.getType());
-        task.setDrillModel(drill.getModel());
-        task.setDrillSize(drill.getSize());
-        task.setManufacturer(drill.getManufacturer());
-        task.setProductionBatch(drill.getProductionBatch());
-        task.setWellNumber(operation.getWellNumber());
-        task.setWellSection(operation.getWellSection());
-        task.setFormation(operation.getFormation());
-        task.setOperationTime(operation.getOperationTime());
-        task.setFootage(operation.getFootage());
-        task.setDrillingHours(operation.getDrillingHours());
-        task.setLocation(operation.getLocation());
-        task.setNotes(operation.getNotes());
-    }
-
     private void recordChange(CollectionTaskDO task, String operation) {
         changeMapper.insert(new CollectionTaskChangeDO()
                 .setTaskId(task.getId())
@@ -468,34 +507,6 @@ public class AppCollectionTaskServiceImpl implements AppCollectionTaskService {
         result.setAuditRegionJson(photo.getAuditRegionJson());
         result.setAuditReportJson(photo.getAuditReportJson());
         return result;
-    }
-
-    private void replaceDynamicCaptures(Long taskId, int bladeCount) {
-        Map<String, CollectionCaptureDO> existing = new HashMap<>();
-        for (CollectionCaptureDO capture : captureMapper.selectByTaskId(taskId)) {
-            existing.put(capture.getCaptureCode(), capture);
-        }
-        upsertDynamicCapture(taskId, existing.remove("overall"), "overall", "钻头全局图",
-                "钻头完整进入画面，保持背景简洁", null, 1);
-        for (int bladeNo = 1; bladeNo <= bladeCount; bladeNo++) {
-            String code = "blade-" + bladeNo;
-            upsertDynamicCapture(taskId, existing.remove(code), code, bladeNo + "号刀翼",
-                    "拍摄" + bladeNo + "号刀翼全貌及主要切削齿", bladeNo, bladeNo + 1);
-        }
-        existing.values().forEach(item -> captureMapper.physicalDeleteById(item.getId()));
-    }
-
-    private void upsertDynamicCapture(Long taskId, CollectionCaptureDO current, String code,
-                                      String title, String description, Integer bladeNo, int sortNo) {
-        CollectionCaptureDO capture = current == null ? new CollectionCaptureDO().setTaskId(taskId)
-                .setCaptureCode(code).setState("PENDING") : current;
-        capture.setTitle(title);
-        capture.setDescription(description);
-        capture.setRequiredFlag(true);
-        capture.setBladeNo(bladeNo);
-        capture.setSortNo(sortNo);
-        if (capture.getId() == null) captureMapper.insert(capture);
-        else captureMapper.updateById(capture);
     }
 
     private AppCollectionTaskVO.Resp convert(CollectionTaskDO task) {

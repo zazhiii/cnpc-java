@@ -20,4 +20,10 @@ public interface CollectionTaskEntityMapper extends BaseMapperX<CollectionTaskEn
                 .eq(CollectionTaskEntity::getClientId, clientId)
                 .last("FOR UPDATE"));
     }
+
+    default CollectionTaskEntity selectByIdForUpdate(Long id) {
+        return selectOne(new LambdaQueryWrapperX<CollectionTaskEntity>()
+                .eq(CollectionTaskEntity::getId, id)
+                .last("FOR UPDATE"));
+    }
 }
