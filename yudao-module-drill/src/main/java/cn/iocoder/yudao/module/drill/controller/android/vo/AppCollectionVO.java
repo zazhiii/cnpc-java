@@ -1,4 +1,4 @@
-package cn.iocoder.yudao.module.drill.controller.admin.collection.vo;
+package cn.iocoder.yudao.module.drill.controller.android.vo;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;

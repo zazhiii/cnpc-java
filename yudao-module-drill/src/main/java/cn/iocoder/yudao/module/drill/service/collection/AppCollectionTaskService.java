@@ -1,8 +1,8 @@
 package cn.iocoder.yudao.module.drill.service.collection;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.module.drill.controller.admin.collection.vo.AppCollectionTaskVO;
-import cn.iocoder.yudao.module.drill.controller.admin.collection.vo.AppCollectionVO;
+import cn.iocoder.yudao.module.drill.controller.android.vo.AppCollectionTaskVO;
+import cn.iocoder.yudao.module.drill.controller.android.vo.AppCollectionVO;
 
 public interface AppCollectionTaskService {
     AppCollectionTaskVO.Resp create(Long userId, AppCollectionTaskVO.CreateReq req);

@@ -22,6 +22,9 @@ public class WebProperties {
     @NotNull(message = "Admin API 不能为空")
     @Valid
     private Api adminApi = new Api("/admin-api", "**.controller.admin.**");
+    @NotNull(message = "Android API 不能为空")
+    @Valid
+    private Api androidApi = new Api("/android-api", "**.controller.android.**");
 
     @NotNull(message = "Admin UI 不能为空")
     @Valid

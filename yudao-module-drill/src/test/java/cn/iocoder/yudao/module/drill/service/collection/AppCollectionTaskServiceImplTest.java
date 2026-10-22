@@ -1,8 +1,8 @@
 package cn.iocoder.yudao.module.drill.service.collection;
 
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
-import cn.iocoder.yudao.module.drill.controller.admin.collection.vo.AppCollectionVO;
-import cn.iocoder.yudao.module.drill.controller.admin.collection.vo.AppCollectionTaskVO;
+import cn.iocoder.yudao.module.drill.controller.android.vo.AppCollectionVO;
+import cn.iocoder.yudao.module.drill.controller.android.vo.AppCollectionTaskVO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.collection.CollectionTaskDO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.collection.CollectionCaptureDO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.collection.CollectionPhotoDO;
@@ -10,7 +10,13 @@ import cn.iocoder.yudao.module.drill.dal.dataobject.collection.CollectionTaskCha
 import cn.iocoder.yudao.module.drill.dal.mysql.collection.CollectionCaptureMapper;
 import cn.iocoder.yudao.module.drill.dal.mysql.collection.CollectionPhotoMapper;
 import cn.iocoder.yudao.module.drill.dal.mysql.collection.CollectionTaskChangeMapper;
+import cn.iocoder.yudao.module.drill.dal.entity.collection.CollectionTaskEntity;
+import cn.iocoder.yudao.module.drill.dal.entity.collection.CollectionTaskFormEntity;
+import cn.iocoder.yudao.module.drill.dal.entity.collection.CollectionTaskPhotoItemEntity;
+import cn.iocoder.yudao.module.drill.dal.mysql.collection.CollectionTaskEntityMapper;
+import cn.iocoder.yudao.module.drill.dal.mysql.collection.CollectionTaskFormEntityMapper;
 import cn.iocoder.yudao.module.drill.dal.mysql.collection.CollectionTaskMapper;
+import cn.iocoder.yudao.module.drill.dal.mysql.collection.CollectionTaskPhotoItemEntityMapper;
 import cn.iocoder.yudao.module.infra.service.file.FileService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,6 +27,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.APP_COLLECTION_TASK_VERSION_CONFLICT;
+import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.APP_COLLECTION_IDEMPOTENCY_CONFLICT;
 import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.APP_COLLECTION_INCOMPLETE;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -29,6 +36,10 @@ import static org.mockito.Mockito.*;
 class AppCollectionTaskServiceImplTest {
 
     private final CollectionTaskMapper taskMapper = mock(CollectionTaskMapper.class);
+    private final CollectionTaskEntityMapper taskEntityMapper = mock(CollectionTaskEntityMapper.class);
+    private final CollectionTaskFormEntityMapper taskFormEntityMapper = mock(CollectionTaskFormEntityMapper.class);
+    private final CollectionTaskPhotoItemEntityMapper taskPhotoItemEntityMapper =
+            mock(CollectionTaskPhotoItemEntityMapper.class);
     private final CollectionCaptureMapper captureMapper = mock(CollectionCaptureMapper.class);
     private final CollectionTaskChangeMapper changeMapper = mock(CollectionTaskChangeMapper.class);
     private final CollectionPhotoMapper photoMapper = mock(CollectionPhotoMapper.class);
@@ -38,6 +49,9 @@ class AppCollectionTaskServiceImplTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(service, "taskMapper", taskMapper);
+        ReflectionTestUtils.setField(service, "taskEntityMapper", taskEntityMapper);
+        ReflectionTestUtils.setField(service, "taskFormEntityMapper", taskFormEntityMapper);
+        ReflectionTestUtils.setField(service, "taskPhotoItemEntityMapper", taskPhotoItemEntityMapper);
         ReflectionTestUtils.setField(service, "captureMapper", captureMapper);
         ReflectionTestUtils.setField(service, "changeMapper", changeMapper);
         ReflectionTestUtils.setField(service, "photoMapper", photoMapper);
@@ -47,63 +61,82 @@ class AppCollectionTaskServiceImplTest {
     @Test
     void createShouldBeIdempotentByClientId() {
         AppCollectionTaskVO.CreateReq request = request("same-client");
-        CollectionTaskDO existing = task(7L, "same-client", 1);
-        when(taskMapper.selectByClientId(9L, "same-client")).thenReturn(existing);
-        when(captureMapper.selectByTaskId(7L)).thenReturn(List.of(
-                new CollectionCaptureDO().setTaskId(7L).setCaptureCode("blade-1").setBladeNo(1)));
+        CollectionTaskEntity existing = taskEntity(7L, "same-client");
+        when(taskEntityMapper.selectByUserIdAndClientId(9L, "same-client")).thenReturn(existing);
+        when(taskFormEntityMapper.selectByTaskId(7L)).thenReturn(taskFormEntity(7L));
+        when(taskPhotoItemEntityMapper.selectListByTaskId(7L)).thenReturn(List.of(
+                photoItem(7L, "OVERALL", null), photoItem(7L, "BLADE", 1)));
 
         AppCollectionTaskVO.Resp result = service.create(9L, request);
 
         assertEquals(7L, result.getId());
-        verify(taskMapper, never()).insert(any(CollectionTaskDO.class));
-        verify(captureMapper, never()).insert(any(CollectionCaptureDO.class));
+        verify(taskEntityMapper, never()).insert(any(CollectionTaskEntity.class));
+        verify(taskFormEntityMapper, never()).insert(any(CollectionTaskFormEntity.class));
+        verify(taskPhotoItemEntityMapper, never()).insert(any(CollectionTaskPhotoItemEntity.class));
+    }
+
+    @Test
+    void createShouldRejectDifferentRequestUsingSameClientId() {
+        AppCollectionTaskVO.CreateReq request = request("same-client");
+        request.getDrillBit().setCode("PDC-OTHER");
+        CollectionTaskEntity existing = taskEntity(7L, "same-client");
+        when(taskEntityMapper.selectByUserIdAndClientId(9L, "same-client")).thenReturn(existing);
+        when(taskFormEntityMapper.selectByTaskId(7L)).thenReturn(taskFormEntity(7L));
+        when(taskPhotoItemEntityMapper.selectListByTaskId(7L)).thenReturn(List.of(
+                photoItem(7L, "OVERALL", null), photoItem(7L, "BLADE", 1)));
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.create(9L, request));
+
+        assertEquals(APP_COLLECTION_IDEMPOTENCY_CONFLICT.getCode(), error.getCode());
+        verify(taskEntityMapper, never()).insert(any(CollectionTaskEntity.class));
     }
 
     @Test
     void createShouldGenerateDefaultChecklistAndTaskNumber() {
         AppCollectionTaskVO.CreateReq request = request("new-client");
-        when(captureMapper.selectByTaskId(501L)).thenReturn(List.of());
         doAnswer(invocation -> {
-            CollectionTaskDO inserted = invocation.getArgument(0);
+            CollectionTaskEntity inserted = invocation.getArgument(0);
             inserted.setId(501L);
             inserted.setCreateTime(LocalDateTime.of(2026, 9, 9, 8, 0));
             inserted.setUpdateTime(inserted.getCreateTime());
             return 1;
-        }).when(taskMapper).insert(any(CollectionTaskDO.class));
+        }).when(taskEntityMapper).insert(any(CollectionTaskEntity.class));
 
         AppCollectionTaskVO.Resp result = service.create(9L, request);
 
         assertEquals("CJ-20260909-000501", result.getTaskNo());
         assertEquals(1, result.getVersion());
-        verify(captureMapper, times(2)).insert(any(CollectionCaptureDO.class));
-        verify(captureMapper).insert(org.mockito.ArgumentMatchers.<CollectionCaptureDO>argThat(capture -> capture.getTaskId().equals(501L)
-                && capture.getCaptureCode().equals("overall") && capture.getState().equals("PENDING")));
-        verify(captureMapper).insert(org.mockito.ArgumentMatchers.<CollectionCaptureDO>argThat(capture ->
-                capture.getCaptureCode().equals("blade-1") && capture.getBladeNo().equals(1)));
-        verify(changeMapper).insert(org.mockito.ArgumentMatchers.<CollectionTaskChangeDO>argThat(change -> change.getClientId().equals("new-client")
-                && change.getOperation().equals("UPSERT")));
+        verify(taskFormEntityMapper).insert(org.mockito.ArgumentMatchers.<CollectionTaskFormEntity>argThat(form ->
+                form.getTaskId().equals(501L) && form.getDrillCode().equals("PDC-001")
+                        && form.getWellNumber().equals("川页H12-3井")));
+        verify(taskPhotoItemEntityMapper, times(2)).insert(any(CollectionTaskPhotoItemEntity.class));
+        verify(taskPhotoItemEntityMapper).insert(org.mockito.ArgumentMatchers.<CollectionTaskPhotoItemEntity>argThat(item ->
+                item.getTaskId().equals(501L) && item.getPhotoType().equals("OVERALL")
+                        && item.getBladeNo() == null && item.getStatus().equals("PENDING")));
+        verify(taskPhotoItemEntityMapper).insert(org.mockito.ArgumentMatchers.<CollectionTaskPhotoItemEntity>argThat(item ->
+                item.getPhotoType().equals("BLADE") && item.getBladeNo().equals(1)));
     }
 
     @Test
     void createShouldPersistClientBladeCount() {
         AppCollectionTaskVO.CreateReq request = request("dynamic-client");
         request.setBladeCount(3);
-        when(captureMapper.selectByTaskId(502L)).thenReturn(List.of());
         doAnswer(invocation -> {
-            CollectionTaskDO inserted = invocation.getArgument(0);
+            CollectionTaskEntity inserted = invocation.getArgument(0);
             inserted.setId(502L);
             inserted.setCreateTime(LocalDateTime.of(2026, 9, 11, 8, 0));
             inserted.setUpdateTime(inserted.getCreateTime());
             return 1;
-        }).when(taskMapper).insert(any(CollectionTaskDO.class));
+        }).when(taskEntityMapper).insert(any(CollectionTaskEntity.class));
 
         service.create(9L, request);
 
-        verify(captureMapper, times(4)).insert(any(CollectionCaptureDO.class));
-        verify(captureMapper).insert(org.mockito.ArgumentMatchers.<CollectionCaptureDO>argThat(capture ->
-                capture.getCaptureCode().equals("overall") && capture.getBladeNo() == null));
-        verify(captureMapper).insert(org.mockito.ArgumentMatchers.<CollectionCaptureDO>argThat(capture ->
-                capture.getCaptureCode().equals("blade-3") && capture.getBladeNo().equals(3)));
+        verify(taskPhotoItemEntityMapper, times(4)).insert(any(CollectionTaskPhotoItemEntity.class));
+        verify(taskPhotoItemEntityMapper).insert(org.mockito.ArgumentMatchers.<CollectionTaskPhotoItemEntity>argThat(item ->
+                item.getPhotoType().equals("OVERALL") && item.getBladeNo() == null));
+        verify(taskPhotoItemEntityMapper).insert(org.mockito.ArgumentMatchers.<CollectionTaskPhotoItemEntity>argThat(item ->
+                item.getPhotoType().equals("BLADE") && item.getBladeNo().equals(3)));
     }
 
     @Test
@@ -243,6 +276,29 @@ class AppCollectionTaskServiceImplTest {
         task.setCreateTime(now);
         task.setUpdateTime(now);
         return task;
+    }
+
+    private static CollectionTaskEntity taskEntity(Long id, String clientId) {
+        LocalDateTime now = LocalDateTime.of(2026, 9, 9, 8, 0);
+        CollectionTaskEntity task = new CollectionTaskEntity().setId(id).setClientId(clientId)
+                .setUserId(9L).setTaskNo("CJ-20260909-000007")
+                .setTaskType("PULL_OUT").setStatus("DRAFT");
+        task.setCreateTime(now);
+        task.setUpdateTime(now);
+        task.setDeleted(false);
+        return task;
+    }
+
+    private static CollectionTaskFormEntity taskFormEntity(Long taskId) {
+        return new CollectionTaskFormEntity().setTaskId(taskId).setDrillCode("PDC-001")
+                .setDrillType("PDC钻头").setWellNumber("川页H12-3井");
+    }
+
+    private static CollectionTaskPhotoItemEntity photoItem(Long taskId, String type, Integer bladeNo) {
+        return new CollectionTaskPhotoItemEntity().setTaskId(taskId).setPhotoType(type)
+                .setTitle(bladeNo == null ? "钻头全局图" : bladeNo + "号刀翼")
+                .setRequiredFlag(true).setBladeNo(bladeNo)
+                .setSortNo(bladeNo == null ? 1 : bladeNo + 1).setStatus("PENDING");
     }
 
     private static CollectionCaptureDO capture(Long taskId, String code, boolean required) {

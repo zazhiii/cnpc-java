@@ -50,7 +50,7 @@ CREATE TABLE `drill_collection_task_form` (
     `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updater` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '更新者',
     `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
+    `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='App 钻头采集任务表单';
 
 -- 第二步：任务拍摄清单。一条记录描述一张需要采集的照片，不保存正式文件。

@@ -6,7 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
-@TableName("drill_collection_task_change")
+//@TableName("drill_collection_task_change")
 @KeySequence("drill_collection_task_change_seq")
 @Data
 @EqualsAndHashCode(callSuper = true)

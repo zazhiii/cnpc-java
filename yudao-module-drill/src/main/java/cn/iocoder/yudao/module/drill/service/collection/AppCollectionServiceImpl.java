@@ -2,7 +2,7 @@ package cn.iocoder.yudao.module.drill.service.collection;
 
 import cn.hutool.core.io.IoUtil;
 import cn.hutool.core.util.StrUtil;
-import cn.iocoder.yudao.module.drill.controller.admin.collection.vo.AppCollectionVO;
+import cn.iocoder.yudao.module.drill.controller.android.vo.AppCollectionVO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.collection.CollectionCaptureDO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.collection.CollectionPhotoDO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.collection.CollectionTaskDO;

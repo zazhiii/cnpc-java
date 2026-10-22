@@ -1,6 +1,6 @@
 package cn.iocoder.yudao.module.drill.service.collection;
 
-import cn.iocoder.yudao.module.drill.controller.admin.collection.vo.AppCollectionVO;
+import cn.iocoder.yudao.module.drill.controller.android.vo.AppCollectionVO;
 
 import java.util.List;
 

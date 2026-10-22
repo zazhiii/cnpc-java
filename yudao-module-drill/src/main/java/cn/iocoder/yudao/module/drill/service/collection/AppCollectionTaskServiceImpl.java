@@ -1,21 +1,27 @@
 package cn.iocoder.yudao.module.drill.service.collection;
 
 import cn.hutool.core.io.IoUtil;
+import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.module.drill.controller.admin.collection.vo.AppCollectionVO;
-import cn.iocoder.yudao.module.drill.controller.admin.collection.vo.AppCollectionTaskVO;
+import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
+import cn.iocoder.yudao.module.drill.controller.android.vo.AppCollectionVO;
+import cn.iocoder.yudao.module.drill.controller.android.vo.AppCollectionTaskVO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.collection.*;
+import cn.iocoder.yudao.module.drill.dal.entity.collection.CollectionTaskEntity;
+import cn.iocoder.yudao.module.drill.dal.entity.collection.CollectionTaskFormEntity;
+import cn.iocoder.yudao.module.drill.dal.entity.collection.CollectionTaskPhotoItemEntity;
 import cn.iocoder.yudao.module.drill.dal.mysql.collection.*;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import cn.iocoder.yudao.module.infra.service.file.FileService;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import jakarta.annotation.Resource;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.dao.DuplicateKeyException;
 
-import java.time.format.DateTimeFormatter;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,13 +34,18 @@ import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.*;
 
 @Service
 public class AppCollectionTaskServiceImpl implements AppCollectionTaskService {
-//    private static final String DRAFT = "DRAFT";
     private static final String PENDING_QUALITY = "PENDING_QUALITY";
     private static final String COMPLETED = "COMPLETED";
     private static final int SYNC_LIMIT = 100;
 
     @Resource
     private CollectionTaskMapper taskMapper;
+    @Resource
+    private CollectionTaskEntityMapper taskEntityMapper;
+    @Resource
+    private CollectionTaskFormEntityMapper taskFormEntityMapper;
+    @Resource
+    private CollectionTaskPhotoItemEntityMapper taskPhotoItemEntityMapper;
     @Resource
     private CollectionCaptureMapper captureMapper;
     @Resource
@@ -45,38 +56,49 @@ public class AppCollectionTaskServiceImpl implements AppCollectionTaskService {
     private FileService fileService;
 
     @Override
+    @TenantIgnore
     @Transactional(rollbackFor = Exception.class)
     public AppCollectionTaskVO.Resp create(Long userId, AppCollectionTaskVO.CreateReq req) {
-        CollectionTaskDO existing = taskMapper.selectByClientId(userId, req.getClientId());
+        CollectionTaskEntity existing = taskEntityMapper.selectByUserIdAndClientId(userId, req.getClientId());
         if (existing != null) {
-            if (!sameIdentity(existing, req)) {
+            CollectionTaskFormEntity existingForm = taskFormEntityMapper.selectByTaskId(existing.getId());
+            List<CollectionTaskPhotoItemEntity> existingItems =
+                    taskPhotoItemEntityMapper.selectListByTaskId(existing.getId());
+            if (!sameCreateRequest(existing, existingForm, existingItems, req)) {
                 throw exception(APP_COLLECTION_IDEMPOTENCY_CONFLICT);
             }
-            return convert(existing);
+            return convertCreatedTask(existing, existingForm, existingItems);
         }
 
-        CollectionTaskDO task = new CollectionTaskDO()
+        CollectionTaskEntity task = new CollectionTaskEntity()
                 .setClientId(req.getClientId())
-                .setTaskNo("PENDING-" + req.getClientId())
+                .setUserId(userId)
+                .setTaskNo("PENDING-" + IdUtil.fastSimpleUUID())
                 .setTaskType(req.getTaskType())
-                .setStatus(DRAFT.getCode())
-                .setVersion(1)
-                .setCollectorUserId(userId);
-        copy(req.getDrillBit(), req.getOperation(), task);
+                .setStatus(DRAFT.getCode());
         try {
-            taskMapper.insert(task);
+            taskEntityMapper.insert(task);
         } catch (DuplicateKeyException ex) {
-            CollectionTaskDO concurrent = taskMapper.selectByClientId(userId, req.getClientId());
-            if (concurrent != null && sameIdentity(concurrent, req)) return convert(concurrent);
+            CollectionTaskEntity concurrent =
+                    taskEntityMapper.selectByUserIdAndClientIdForUpdate(userId, req.getClientId());
+            if (concurrent != null) {
+                CollectionTaskFormEntity concurrentForm = taskFormEntityMapper.selectByTaskId(concurrent.getId());
+                List<CollectionTaskPhotoItemEntity> concurrentItems =
+                        taskPhotoItemEntityMapper.selectListByTaskId(concurrent.getId());
+                if (sameCreateRequest(concurrent, concurrentForm, concurrentItems, req)) {
+                    return convertCreatedTask(concurrent, concurrentForm, concurrentItems);
+                }
+            }
             throw exception(APP_COLLECTION_IDEMPOTENCY_CONFLICT);
         }
         task.setTaskNo("CJ-" + task.getCreateTime().format(DateTimeFormatter.BASIC_ISO_DATE)
                 + "-" + String.format("%06d", task.getId()));
-        taskMapper.updateById(task);
+        taskEntityMapper.updateById(task);
 
-        replaceDynamicCaptures(task.getId(), req.getBladeCount());
-        recordChange(task, "UPSERT");
-        return convert(task);
+        CollectionTaskFormEntity form = buildTaskForm(task.getId(), req);
+        taskFormEntityMapper.insert(form);
+        List<CollectionTaskPhotoItemEntity> photoItems = createPhotoItems(task.getId(), req.getBladeCount());
+        return convertCreatedTask(task, form, photoItems);
     }
 
     @Override
@@ -87,12 +109,12 @@ public class AppCollectionTaskServiceImpl implements AppCollectionTaskService {
         int updated = taskMapper.update(update, new LambdaUpdateWrapper<CollectionTaskDO>()
                 .eq(CollectionTaskDO::getId, id)
                 .eq(CollectionTaskDO::getCollectorUserId, userId)
-                .eq(CollectionTaskDO::getStatus, DRAFT)
+                .eq(CollectionTaskDO::getStatus, DRAFT.getCode())
                 .eq(CollectionTaskDO::getVersion, req.getVersion())
                 .setSql("version = version + 1"));
         if (updated == 0) {
             CollectionTaskDO current = requireTask(userId, id);
-            if (!DRAFT.equals(current.getStatus())) throw exception(APP_COLLECTION_TASK_NOT_DRAFT);
+            if (!DRAFT.getCode().equals(current.getStatus())) throw exception(APP_COLLECTION_TASK_NOT_DRAFT);
             throw exception(APP_COLLECTION_TASK_VERSION_CONFLICT);
         }
         CollectionTaskDO task = requireTask(userId, id);
@@ -120,7 +142,7 @@ public class AppCollectionTaskServiceImpl implements AppCollectionTaskService {
         } catch (NumberFormatException ex) {
             throw exception(APP_COLLECTION_SYNC_CURSOR_INVALID);
         }
-        List<CollectionTaskChangeDO> rows = changeMapper.selectChanges(userId, cursor, SYNC_LIMIT + 1);
+         List<CollectionTaskChangeDO> rows = changeMapper.selectChanges(userId, cursor, SYNC_LIMIT + 1);
         boolean hasMore = rows.size() > SYNC_LIMIT;
         if (hasMore) rows = new ArrayList<>(rows.subList(0, SYNC_LIMIT));
 
@@ -155,11 +177,11 @@ public class AppCollectionTaskServiceImpl implements AppCollectionTaskService {
             throw exception(APP_COLLECTION_TASK_NOT_EXISTS);
         }
         if (!Objects.equals(current.getCollectorUserId(), userId)) throw exception(APP_COLLECTION_TASK_FORBIDDEN);
-        if (!DRAFT.equals(current.getStatus())) throw exception(APP_COLLECTION_TASK_DELETE_FORBIDDEN);
+        if (!DRAFT.getCode().equals(current.getStatus())) throw exception(APP_COLLECTION_TASK_DELETE_FORBIDDEN);
         int updated = taskMapper.update(null, new LambdaUpdateWrapper<CollectionTaskDO>()
                 .eq(CollectionTaskDO::getId, id)
                 .eq(CollectionTaskDO::getCollectorUserId, userId)
-                .eq(CollectionTaskDO::getStatus, DRAFT)
+                .eq(CollectionTaskDO::getStatus, DRAFT.getCode())
                 .eq(CollectionTaskDO::getVersion, version)
                 .set(CollectionTaskDO::getDeleted, true)
                 .setSql("version = version + 1"));
@@ -173,7 +195,7 @@ public class AppCollectionTaskServiceImpl implements AppCollectionTaskService {
     public AppCollectionVO.PhotoResp uploadPhoto(Long userId, Long id, String captureCode,
                                                   AppCollectionVO.UploadReq req) {
         CollectionTaskDO task = requireTask(userId, id);
-        if (!DRAFT.equals(task.getStatus())) throw exception(APP_COLLECTION_TASK_NOT_DRAFT);
+        if (!DRAFT.getCode().equals(task.getStatus())) throw exception(APP_COLLECTION_TASK_NOT_DRAFT);
         CollectionCaptureDO capture = captureMapper.selectByTaskId(id).stream()
                 .filter(item -> Objects.equals(item.getCaptureCode(), captureCode))
                 .findFirst()
@@ -215,7 +237,7 @@ public class AppCollectionTaskServiceImpl implements AppCollectionTaskService {
     public AppCollectionTaskVO.Resp submit(Long userId, Long id) {
         CollectionTaskDO task = requireTask(userId, id);
         if (COMPLETED.equals(task.getStatus())) return convert(task);
-        if (!DRAFT.equals(task.getStatus()) && !PENDING_QUALITY.equals(task.getStatus())) {
+        if (!DRAFT.getCode().equals(task.getStatus()) && !PENDING_QUALITY.equals(task.getStatus())) {
             throw exception(APP_COLLECTION_TASK_NOT_DRAFT);
         }
 
@@ -249,12 +271,157 @@ public class AppCollectionTaskServiceImpl implements AppCollectionTaskService {
         return task;
     }
 
-    private boolean sameIdentity(CollectionTaskDO task, AppCollectionTaskVO.CreateReq req) {
-        return Objects.equals(task.getTaskType(), req.getTaskType())
-                && Objects.equals(task.getDrillCode(), req.getDrillBit().getCode())
-                && Objects.equals(req.getBladeCount(),
-                (int) captureMapper.selectByTaskId(task.getId()).stream()
-                        .filter(item -> item.getBladeNo() != null).count());
+    private boolean sameCreateRequest(CollectionTaskEntity task, CollectionTaskFormEntity form,
+                                      List<CollectionTaskPhotoItemEntity> photoItems,
+                                      AppCollectionTaskVO.CreateReq req) {
+        if (!Objects.equals(task.getTaskType(), req.getTaskType()) || form == null) {
+            return false;
+        }
+        AppCollectionTaskVO.DrillBit drill = req.getDrillBit();
+        AppCollectionTaskVO.Operation operation = req.getOperation();
+        boolean sameForm = Objects.equals(form.getDrillCode(), drill.getCode())
+                && Objects.equals(form.getDrillType(), drill.getType())
+                && Objects.equals(form.getDrillModel(), drill.getModel())
+                && Objects.equals(form.getDrillSize(), drill.getSize())
+                && Objects.equals(form.getManufacturer(), drill.getManufacturer())
+                && Objects.equals(form.getProductionBatch(), drill.getProductionBatch())
+                && Objects.equals(form.getWellNumber(), operation.getWellNumber())
+                && Objects.equals(form.getWellSection(), operation.getWellSection())
+                && Objects.equals(form.getFormation(), operation.getFormation())
+                && Objects.equals(form.getOperationTime(), operation.getOperationTime())
+                && sameDecimal(form.getFootage(), operation.getFootage())
+                && sameDecimal(form.getDrillingHours(), operation.getDrillingHours())
+                && Objects.equals(form.getLocation(), operation.getLocation())
+                && Objects.equals(form.getNotes(), operation.getNotes());
+        return sameForm && samePhotoItems(photoItems, req.getBladeCount());
+    }
+
+    private boolean sameDecimal(BigDecimal first, BigDecimal second) {
+        if (first == null || second == null) {
+            return first == second;
+        }
+        return first.compareTo(second) == 0;
+    }
+
+    private boolean samePhotoItems(List<CollectionTaskPhotoItemEntity> photoItems, int bladeCount) {
+        if (photoItems.size() != bladeCount + 1) {
+            return false;
+        }
+        long overallCount = photoItems.stream()
+                .filter(item -> "OVERALL".equals(item.getPhotoType()) && item.getBladeNo() == null)
+                .count();
+        if (overallCount != 1) {
+            return false;
+        }
+        for (int bladeNo = 1; bladeNo <= bladeCount; bladeNo++) {
+            int expectedBladeNo = bladeNo;
+            boolean exists = photoItems.stream().anyMatch(item -> "BLADE".equals(item.getPhotoType())
+                    && Objects.equals(item.getBladeNo(), expectedBladeNo));
+            if (!exists) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private CollectionTaskFormEntity buildTaskForm(Long taskId, AppCollectionTaskVO.CreateReq req) {
+        AppCollectionTaskVO.DrillBit drill = req.getDrillBit();
+        AppCollectionTaskVO.Operation operation = req.getOperation();
+        return new CollectionTaskFormEntity()
+                .setTaskId(taskId)
+                .setDrillCode(drill.getCode())
+                .setDrillType(drill.getType())
+                .setDrillModel(drill.getModel())
+                .setDrillSize(drill.getSize())
+                .setManufacturer(drill.getManufacturer())
+                .setProductionBatch(drill.getProductionBatch())
+                .setWellNumber(operation.getWellNumber())
+                .setWellSection(operation.getWellSection())
+                .setFormation(operation.getFormation())
+                .setOperationTime(operation.getOperationTime())
+                .setFootage(operation.getFootage())
+                .setDrillingHours(operation.getDrillingHours())
+                .setLocation(operation.getLocation())
+                .setNotes(operation.getNotes());
+    }
+
+    private List<CollectionTaskPhotoItemEntity> createPhotoItems(Long taskId, int bladeCount) {
+        List<CollectionTaskPhotoItemEntity> items = new ArrayList<>(bladeCount + 1);
+        CollectionTaskPhotoItemEntity overall = new CollectionTaskPhotoItemEntity()
+                .setTaskId(taskId)
+                .setPhotoType("OVERALL")
+                .setTitle("钻头全局图")
+                .setRequiredFlag(true)
+                .setSortNo(1)
+                .setStatus("PENDING");
+        taskPhotoItemEntityMapper.insert(overall);
+        items.add(overall);
+        for (int bladeNo = 1; bladeNo <= bladeCount; bladeNo++) {
+            CollectionTaskPhotoItemEntity blade = new CollectionTaskPhotoItemEntity()
+                    .setTaskId(taskId)
+                    .setPhotoType("BLADE")
+                    .setTitle(bladeNo + "号刀翼")
+                    .setRequiredFlag(true)
+                    .setBladeNo(bladeNo)
+                    .setSortNo(bladeNo + 1)
+                    .setStatus("PENDING");
+            taskPhotoItemEntityMapper.insert(blade);
+            items.add(blade);
+        }
+        return items;
+    }
+
+    private AppCollectionTaskVO.Resp convertCreatedTask(CollectionTaskEntity task,
+                                                        CollectionTaskFormEntity form,
+                                                        List<CollectionTaskPhotoItemEntity> photoItems) {
+        AppCollectionTaskVO.Resp result = new AppCollectionTaskVO.Resp();
+        result.setId(task.getId());
+        result.setClientId(task.getClientId());
+        result.setTaskNo(task.getTaskNo());
+        result.setTaskType(task.getTaskType());
+        result.setStatus(task.getStatus());
+        // 兼容当前 App 协议；数据库新模型不再持久化 version。
+        result.setVersion(1);
+
+        AppCollectionTaskVO.DrillBit drill = new AppCollectionTaskVO.DrillBit();
+        drill.setCode(form.getDrillCode());
+        drill.setType(form.getDrillType());
+        drill.setModel(form.getDrillModel());
+        drill.setSize(form.getDrillSize());
+        drill.setManufacturer(form.getManufacturer());
+        drill.setProductionBatch(form.getProductionBatch());
+        result.setDrillBit(drill);
+
+        AppCollectionTaskVO.Operation operation = new AppCollectionTaskVO.Operation();
+        operation.setWellNumber(form.getWellNumber());
+        operation.setWellSection(form.getWellSection());
+        operation.setFormation(form.getFormation());
+        operation.setOperationTime(form.getOperationTime());
+        operation.setFootage(form.getFootage());
+        operation.setDrillingHours(form.getDrillingHours());
+        operation.setLocation(form.getLocation());
+        operation.setNotes(form.getNotes());
+        result.setOperation(operation);
+        result.setCaptures(photoItems.stream().map(this::convertCreatedPhotoItem).toList());
+        result.setCreatedAt(task.getCreateTime());
+        result.setUpdatedAt(task.getUpdateTime());
+        result.setDeleted(Boolean.TRUE.equals(task.getDeleted()));
+        return result;
+    }
+
+    private AppCollectionTaskVO.Capture convertCreatedPhotoItem(CollectionTaskPhotoItemEntity item) {
+        AppCollectionTaskVO.Capture result = new AppCollectionTaskVO.Capture();
+        result.setId(item.getId());
+        result.setCode(item.getBladeNo() == null ? "overall" : "blade-" + item.getBladeNo());
+        result.setTitle(item.getTitle());
+        result.setDescription(item.getBladeNo() == null
+                ? "钻头完整进入画面，保持背景简洁"
+                : "拍摄" + item.getBladeNo() + "号刀翼全貌及主要切削齿");
+        result.setRequired(item.getRequiredFlag());
+        result.setBladeNo(item.getBladeNo());
+        result.setSortNo(item.getSortNo());
+        result.setState(item.getStatus());
+        return result;
     }
 
     private void copy(AppCollectionTaskVO.DrillBit drill, AppCollectionTaskVO.Operation operation,

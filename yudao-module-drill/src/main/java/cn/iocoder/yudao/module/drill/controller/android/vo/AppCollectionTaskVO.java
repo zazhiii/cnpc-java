@@ -1,4 +1,4 @@
-package cn.iocoder.yudao.module.drill.controller.admin.collection.vo;
+package cn.iocoder.yudao.module.drill.controller.android.vo;
 
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -18,7 +18,8 @@ public final class AppCollectionTaskVO {
     @Data
     public static class DrillBit {
         @Size(max = 80) private String code;
-        @NotBlank @Size(max = 64) private String type;
+        // 草稿允许尚未填写钻头类型；进入拍摄清单前由 App 执行必填校验。
+        @Size(max = 64) private String type;
         @Size(max = 64) private String model;
         @Size(max = 32) private String size;
         @Size(max = 100) private String manufacturer;

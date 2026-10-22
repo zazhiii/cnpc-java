@@ -1,9 +1,9 @@
-package cn.iocoder.yudao.module.drill.controller.admin.collection;
+package cn.iocoder.yudao.module.drill.controller.android;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.module.drill.controller.admin.collection.vo.AppCollectionVO;
-import cn.iocoder.yudao.module.drill.controller.admin.collection.vo.AppCollectionTaskVO;
+import cn.iocoder.yudao.module.drill.controller.android.vo.AppCollectionVO;
+import cn.iocoder.yudao.module.drill.controller.android.vo.AppCollectionTaskVO;
 import cn.iocoder.yudao.module.drill.service.collection.AppCollectionService;
 import cn.iocoder.yudao.module.drill.service.collection.AppCollectionPhotoQualityService;
 import cn.iocoder.yudao.module.drill.service.collection.AppCollectionTaskService;
@@ -18,8 +18,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
+import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.APP_COLLECTION_IDEMPOTENCY_CONFLICT;
 
 @Tag(name = "Android App - 钻头采集任务")
 @RestController
@@ -42,7 +44,11 @@ public class AppCollectionController {
     public CommonResult<AppCollectionTaskVO.Resp> createTask(
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody AppCollectionTaskVO.CreateReq req) {
-        // clientId 是持久幂等键；Header 用于链路可观测性并保持通用客户端约定。
+        // 数据库以 user_id + client_id 作为持久幂等键；App 当前将 clientId 同时放入请求头。
+        if (idempotencyKey != null && !idempotencyKey.isBlank()
+                && !idempotencyKey.equals(req.getClientId())) {
+            throw exception(APP_COLLECTION_IDEMPOTENCY_CONFLICT);
+        }
         return success(taskService.create(getLoginUserId(), req));
     }
 

@@ -3,7 +3,7 @@ package cn.iocoder.yudao.module.drill.dal.mysql.collection;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.module.drill.controller.admin.collection.vo.AppCollectionTaskVO;
+import cn.iocoder.yudao.module.drill.controller.android.vo.AppCollectionTaskVO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.collection.CollectionTaskDO;
 import org.apache.ibatis.annotations.Mapper;
 

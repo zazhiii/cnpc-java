@@ -2,7 +2,7 @@ package cn.iocoder.yudao.module.drill.service.collection;
 
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.module.drill.config.E11QualityGateProperties;
-import cn.iocoder.yudao.module.drill.controller.admin.collection.vo.AppCollectionVO;
+import cn.iocoder.yudao.module.drill.controller.android.vo.AppCollectionVO;
 import cn.iocoder.yudao.module.drill.service.image.ImageFileValidator;
 import cn.iocoder.yudao.module.drill.service.quality.checker.E11ModelQualityChecker;
 import cn.iocoder.yudao.module.drill.service.quality.model.ImageQualityModelResult;

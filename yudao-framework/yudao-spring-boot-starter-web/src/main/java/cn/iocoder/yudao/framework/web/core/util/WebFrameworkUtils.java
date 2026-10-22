@@ -111,6 +111,10 @@ public class WebFrameworkUtils {
         if (request.getServletPath().startsWith(properties.getAdminApi().getPrefix())) {
             return UserTypeEnum.ADMIN.getValue();
         }
+        // Android 端复用管理员账号的登录与 Token，所以属于 ADMIN 用户类型。
+        if (request.getServletPath().startsWith(properties.getAndroidApi().getPrefix())) {
+            return UserTypeEnum.ADMIN.getValue();
+        }
         if (request.getServletPath().startsWith(properties.getAppApi().getPrefix())) {
             return UserTypeEnum.MEMBER.getValue();
         }
