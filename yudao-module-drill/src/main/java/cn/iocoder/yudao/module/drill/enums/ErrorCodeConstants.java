@@ -62,7 +62,6 @@ public interface ErrorCodeConstants {
     ErrorCode APP_COLLECTION_TASK_VERSION_CONFLICT = new ErrorCode(1_050_000_065, "任务已在其他设备更新，请处理同步冲突");
     ErrorCode APP_COLLECTION_CAPTURE_NOT_EXISTS = new ErrorCode(1_050_000_066, "任务拍摄项不存在");
     ErrorCode APP_COLLECTION_IDEMPOTENCY_CONFLICT = new ErrorCode(1_050_000_068, "clientId 已被不同任务使用");
-    ErrorCode APP_COLLECTION_SYNC_CURSOR_INVALID = new ErrorCode(1_050_000_069, "同步游标无效");
     ErrorCode APP_COLLECTION_TASK_FORBIDDEN = new ErrorCode(1_050_000_070, "无权访问该采集任务");
 
     ErrorCode E11_QUALITY_GATE_UNAVAILABLE = new ErrorCode(1_050_000_070,
@@ -87,5 +86,7 @@ public interface ErrorCodeConstants {
     ErrorCode QUALITY_RECORD_NOT_EXISTS = new ErrorCode(1_050_000_089, "图片质检记录不存在");
     ErrorCode QUALITY_MODEL_EXECUTION_FAILED = new ErrorCode(1_050_000_090, "图片质检模型执行失败");
     ErrorCode QUALITY_CHECKER_UNSUPPORTED = new ErrorCode(1_050_000_091, "不支持的图片质检项：{}");
+    ErrorCode COLLECTION_BLADE_PHOTO_NOT_EXISTS = new ErrorCode(1_050_000_092, "该任务下的刀翼照片不存在");
+    ErrorCode COLLECTION_PREDICTION_NOT_EXISTS = new ErrorCode(1_050_000_093, "该照片下的预测记录不存在");
 
 }

@@ -3,19 +3,13 @@ package cn.iocoder.yudao.module.drill.service.collection;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.module.drill.controller.android.vo.AppCollectionVO;
 import cn.iocoder.yudao.module.drill.controller.android.vo.AppCollectionTaskVO;
-import cn.iocoder.yudao.module.drill.dal.dataobject.collection.CollectionTaskDO;
-import cn.iocoder.yudao.module.drill.dal.dataobject.collection.CollectionCaptureDO;
-import cn.iocoder.yudao.module.drill.dal.dataobject.collection.CollectionPhotoDO;
-import cn.iocoder.yudao.module.drill.dal.dataobject.collection.CollectionTaskChangeDO;
-import cn.iocoder.yudao.module.drill.dal.mysql.collection.CollectionCaptureMapper;
-import cn.iocoder.yudao.module.drill.dal.mysql.collection.CollectionPhotoMapper;
-import cn.iocoder.yudao.module.drill.dal.mysql.collection.CollectionTaskChangeMapper;
 import cn.iocoder.yudao.module.drill.dal.entity.collection.CollectionTaskEntity;
 import cn.iocoder.yudao.module.drill.dal.entity.collection.CollectionTaskFormEntity;
+import cn.iocoder.yudao.module.drill.dal.entity.collection.CollectionTaskPhotoFileEntity;
 import cn.iocoder.yudao.module.drill.dal.entity.collection.CollectionTaskPhotoItemEntity;
 import cn.iocoder.yudao.module.drill.dal.mysql.collection.CollectionTaskEntityMapper;
 import cn.iocoder.yudao.module.drill.dal.mysql.collection.CollectionTaskFormEntityMapper;
-import cn.iocoder.yudao.module.drill.dal.mysql.collection.CollectionTaskMapper;
+import cn.iocoder.yudao.module.drill.dal.mysql.collection.CollectionTaskPhotoFileEntityMapper;
 import cn.iocoder.yudao.module.drill.dal.mysql.collection.CollectionTaskPhotoItemEntityMapper;
 import cn.iocoder.yudao.module.infra.service.file.FileService;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,26 +30,21 @@ import static org.mockito.Mockito.*;
 
 class AppCollectionTaskServiceImplTest {
 
-    private final CollectionTaskMapper taskMapper = mock(CollectionTaskMapper.class);
     private final CollectionTaskEntityMapper taskEntityMapper = mock(CollectionTaskEntityMapper.class);
     private final CollectionTaskFormEntityMapper taskFormEntityMapper = mock(CollectionTaskFormEntityMapper.class);
     private final CollectionTaskPhotoItemEntityMapper taskPhotoItemEntityMapper =
             mock(CollectionTaskPhotoItemEntityMapper.class);
-    private final CollectionCaptureMapper captureMapper = mock(CollectionCaptureMapper.class);
-    private final CollectionTaskChangeMapper changeMapper = mock(CollectionTaskChangeMapper.class);
-    private final CollectionPhotoMapper photoMapper = mock(CollectionPhotoMapper.class);
+    private final CollectionTaskPhotoFileEntityMapper taskPhotoFileEntityMapper =
+            mock(CollectionTaskPhotoFileEntityMapper.class);
     private final FileService fileService = mock(FileService.class);
     private final AppCollectionTaskServiceImpl service = new AppCollectionTaskServiceImpl();
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(service, "taskMapper", taskMapper);
         ReflectionTestUtils.setField(service, "taskEntityMapper", taskEntityMapper);
         ReflectionTestUtils.setField(service, "taskFormEntityMapper", taskFormEntityMapper);
         ReflectionTestUtils.setField(service, "taskPhotoItemEntityMapper", taskPhotoItemEntityMapper);
-        ReflectionTestUtils.setField(service, "captureMapper", captureMapper);
-        ReflectionTestUtils.setField(service, "changeMapper", changeMapper);
-        ReflectionTestUtils.setField(service, "photoMapper", photoMapper);
+        ReflectionTestUtils.setField(service, "taskPhotoFileEntityMapper", taskPhotoFileEntityMapper);
         ReflectionTestUtils.setField(service, "fileService", fileService);
     }
 
@@ -171,7 +160,6 @@ class AppCollectionTaskServiceImplTest {
         verify(taskPhotoItemEntityMapper).updateById(blade1);
         verify(taskPhotoItemEntityMapper).deleteById(43L);
         verify(taskEntityMapper).updateById(task);
-        verifyNoInteractions(taskMapper, changeMapper);
     }
 
     @Test
@@ -202,29 +190,30 @@ class AppCollectionTaskServiceImplTest {
 
     @Test
     void submitShouldRequireEveryDynamicRequiredCapture() {
-        CollectionTaskDO task = task(7L, "missing-photo", 1);
-        List<CollectionCaptureDO> captures = List.of(
-                capture(7L, "overall", true),
-                capture(7L, "blade-1", true));
-        when(taskMapper.selectById(7L)).thenReturn(task);
-        when(captureMapper.selectByTaskId(7L)).thenReturn(captures);
-        when(photoMapper.selectListByTask(7L)).thenReturn(List.of(
-                photo(7L, "overall", "PASSED")));
+        CollectionTaskEntity task = taskEntity(7L, "missing-photo");
+        List<CollectionTaskPhotoItemEntity> captures = List.of(
+                photoItem(7L, "OVERALL", null),
+                photoItem(7L, "BLADE", 1));
+        when(taskEntityMapper.selectById(7L)).thenReturn(task);
+        when(taskFormEntityMapper.selectByTaskId(7L)).thenReturn(taskFormEntity(7L));
+        when(taskPhotoItemEntityMapper.selectListByTaskId(7L)).thenReturn(captures);
+        when(taskPhotoFileEntityMapper.selectListByTaskId(7L)).thenReturn(List.of(
+                photoFile(7L, "overall", "PASSED")));
 
         ServiceException error = assertThrows(ServiceException.class,
                 () -> service.submit(9L, 7L));
 
         assertEquals(APP_COLLECTION_INCOMPLETE.getCode(), error.getCode());
-        verify(taskMapper, never()).updateById(any(CollectionTaskDO.class));
-        verify(changeMapper, never()).insert(any(CollectionTaskChangeDO.class));
+        verify(taskEntityMapper, never()).updateById(any(CollectionTaskEntity.class));
     }
 
     @Test
     void uploadPhotoShouldPersistFileAndUpdateCaptureState() {
-        CollectionTaskDO task = task(7L, "upload", 1);
-        CollectionCaptureDO capture = capture(7L, "overall", true).setId(21L).setState("PENDING");
-        when(taskMapper.selectById(7L)).thenReturn(task);
-        when(captureMapper.selectByTaskId(7L)).thenReturn(List.of(capture));
+        CollectionTaskEntity task = taskEntity(7L, "upload");
+        CollectionTaskPhotoItemEntity capture = photoItem(7L, "OVERALL", null)
+                .setId(21L).setStatus("PENDING");
+        when(taskEntityMapper.selectById(7L)).thenReturn(task);
+        when(taskPhotoItemEntityMapper.selectListByTaskId(7L)).thenReturn(List.of(capture));
         when(fileService.createFile(any(byte[].class), eq("overall.jpg"),
                 eq("drill/collection/7"), eq("image/jpeg")))
                 .thenReturn("https://files.example/overall.jpg");
@@ -240,61 +229,65 @@ class AppCollectionTaskServiceImplTest {
         assertEquals("overall", result.getCaptureId());
         assertEquals("WARNING", result.getPhotoState());
         assertEquals("https://files.example/overall.jpg", result.getFileUrl());
-        verify(photoMapper).insert(org.mockito.ArgumentMatchers.<CollectionPhotoDO>argThat(photo ->
+        verify(taskPhotoFileEntityMapper).insert(org.mockito.ArgumentMatchers
+                .<CollectionTaskPhotoFileEntity>argThat(photo ->
                 photo.getTaskId().equals(7L) && photo.getCaptureId().equals("overall")
                         && photo.getPhotoState().equals("WARNING")));
-        verify(captureMapper).updateById(org.mockito.ArgumentMatchers.<CollectionCaptureDO>argThat(item ->
-                item.getId().equals(21L) && item.getState().equals("WARNING")));
+        verify(taskPhotoItemEntityMapper).updateById(org.mockito.ArgumentMatchers
+                .<CollectionTaskPhotoItemEntity>argThat(item ->
+                item.getId().equals(21L) && item.getStatus().equals("WARNING")));
     }
 
     @Test
     void submitShouldIgnoreMissingOptionalCaptureAndCompleteTask() {
-        CollectionTaskDO task = task(7L, "ready", 3);
-        List<CollectionCaptureDO> captures = List.of(
-                capture(7L, "overall", true),
-                capture(7L, "blade-1", true),
-                capture(7L, "extra", false));
-        when(taskMapper.selectById(7L)).thenReturn(task);
-        when(captureMapper.selectByTaskId(7L)).thenReturn(captures);
-        when(photoMapper.selectListByTask(7L)).thenReturn(List.of(
-                photo(7L, "overall", "PASSED"),
-                photo(7L, "blade-1", "WARNING")));
+        CollectionTaskEntity task = taskEntity(7L, "ready");
+        List<CollectionTaskPhotoItemEntity> captures = List.of(
+                photoItem(7L, "OVERALL", null),
+                photoItem(7L, "BLADE", 1),
+                photoItem(7L, "BLADE", 2).setRequiredFlag(false));
+        when(taskEntityMapper.selectById(7L)).thenReturn(task);
+        when(taskFormEntityMapper.selectByTaskId(7L)).thenReturn(taskFormEntity(7L));
+        when(taskPhotoItemEntityMapper.selectListByTaskId(7L)).thenReturn(captures);
+        when(taskPhotoFileEntityMapper.selectListByTaskId(7L)).thenReturn(List.of(
+                photoFile(7L, "overall", "PASSED"),
+                photoFile(7L, "blade-1", "WARNING")));
 
         AppCollectionTaskVO.Resp result = service.submit(9L, 7L);
 
         assertEquals("COMPLETED", result.getStatus());
-        assertEquals(4, result.getVersion());
-        assertNotNull(task.getSubmitTime());
-        verify(taskMapper).updateById(task);
-        verify(changeMapper).insert(org.mockito.ArgumentMatchers.<CollectionTaskChangeDO>argThat(change ->
-                change.getClientId().equals("ready") && change.getTaskVersion().equals(4)));
+        assertEquals(1, result.getVersion());
+        verify(taskEntityMapper).updateById(task);
     }
 
     @Test
     void resubmitPendingQualityTaskShouldCompleteIt() {
-        CollectionTaskDO task = task(7L, "old-pending", 3).setStatus("PENDING_QUALITY");
-        when(taskMapper.selectById(7L)).thenReturn(task);
-        when(captureMapper.selectByTaskId(7L)).thenReturn(List.of(capture(7L, "overall", true)));
-        when(photoMapper.selectListByTask(7L)).thenReturn(List.of(photo(7L, "overall", "PASSED")));
+        CollectionTaskEntity task = taskEntity(7L, "old-pending").setStatus("PENDING_QUALITY");
+        when(taskEntityMapper.selectById(7L)).thenReturn(task);
+        when(taskFormEntityMapper.selectByTaskId(7L)).thenReturn(taskFormEntity(7L));
+        when(taskPhotoItemEntityMapper.selectListByTaskId(7L))
+                .thenReturn(List.of(photoItem(7L, "OVERALL", null)));
+        when(taskPhotoFileEntityMapper.selectListByTaskId(7L))
+                .thenReturn(List.of(photoFile(7L, "overall", "PASSED")));
 
         AppCollectionTaskVO.Resp result = service.submit(9L, 7L);
 
         assertEquals("COMPLETED", result.getStatus());
-        assertEquals(4, result.getVersion());
-        verify(taskMapper).updateById(task);
+        assertEquals(1, result.getVersion());
+        verify(taskEntityMapper).updateById(task);
     }
 
     @Test
     void resubmitCompletedTaskShouldBeIdempotent() {
-        CollectionTaskDO task = task(7L, "done", 4).setStatus("COMPLETED");
-        when(taskMapper.selectById(7L)).thenReturn(task);
-        when(captureMapper.selectByTaskId(7L)).thenReturn(List.of());
+        CollectionTaskEntity task = taskEntity(7L, "done").setStatus("COMPLETED");
+        when(taskEntityMapper.selectById(7L)).thenReturn(task);
+        when(taskFormEntityMapper.selectByTaskId(7L)).thenReturn(taskFormEntity(7L));
+        when(taskPhotoItemEntityMapper.selectListByTaskId(7L)).thenReturn(List.of());
 
         AppCollectionTaskVO.Resp result = service.submit(9L, 7L);
 
         assertEquals("COMPLETED", result.getStatus());
-        assertEquals(4, result.getVersion());
-        verify(taskMapper, never()).updateById(any(CollectionTaskDO.class));
+        assertEquals(1, result.getVersion());
+        verify(taskEntityMapper, never()).updateById(any(CollectionTaskEntity.class));
     }
 
     private static AppCollectionTaskVO.CreateReq request(String clientId) {
@@ -321,16 +314,6 @@ class AppCollectionTaskServiceImplTest {
         return request;
     }
 
-    private static CollectionTaskDO task(Long id, String clientId, int version) {
-        LocalDateTime now = LocalDateTime.of(2026, 9, 9, 8, 0);
-        CollectionTaskDO task = new CollectionTaskDO().setId(id).setClientId(clientId).setTaskNo("CJ-20260909-000007")
-                .setTaskType("PULL_OUT").setStatus("DRAFT").setVersion(version)
-                .setCollectorUserId(9L).setDrillCode("PDC-001").setDrillType("PDC钻头");
-        task.setCreateTime(now);
-        task.setUpdateTime(now);
-        return task;
-    }
-
     private static CollectionTaskEntity taskEntity(Long id, String clientId) {
         LocalDateTime now = LocalDateTime.of(2026, 9, 9, 8, 0);
         CollectionTaskEntity task = new CollectionTaskEntity().setId(id).setClientId(clientId)
@@ -354,14 +337,8 @@ class AppCollectionTaskServiceImplTest {
                 .setSortNo(bladeNo == null ? 1 : bladeNo + 1).setStatus("PENDING");
     }
 
-    private static CollectionCaptureDO capture(Long taskId, String code, boolean required) {
-        return new CollectionCaptureDO().setTaskId(taskId).setCaptureCode(code)
-                .setTitle(code).setDescription(code).setRequiredFlag(required)
-                .setSortNo(1).setState("PASSED");
-    }
-
-    private static CollectionPhotoDO photo(Long taskId, String captureId, String state) {
-        return new CollectionPhotoDO().setTaskId(taskId).setCaptureId(captureId)
+    private static CollectionTaskPhotoFileEntity photoFile(Long taskId, String captureId, String state) {
+        return new CollectionTaskPhotoFileEntity().setTaskId(taskId).setCaptureId(captureId)
                 .setPhotoType(captureId).setPhotoState(state).setFileUrl("/files/" + captureId + ".jpg");
     }
 }

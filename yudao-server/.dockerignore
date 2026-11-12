@@ -1,0 +1,4 @@
+*
+!Dockerfile
+!target/
+!target/yudao-server.jar

@@ -10,10 +10,10 @@ import cn.iocoder.yudao.module.drill.controller.android.vo.AppCollectionTaskVO;
 import cn.iocoder.yudao.module.drill.dal.dataobject.collection.*;
 import cn.iocoder.yudao.module.drill.dal.entity.collection.CollectionTaskEntity;
 import cn.iocoder.yudao.module.drill.dal.entity.collection.CollectionTaskFormEntity;
+import cn.iocoder.yudao.module.drill.dal.entity.collection.CollectionTaskPhotoFileEntity;
 import cn.iocoder.yudao.module.drill.dal.entity.collection.CollectionTaskPhotoItemEntity;
 import cn.iocoder.yudao.module.drill.dal.mysql.collection.*;
 import cn.iocoder.yudao.module.infra.service.file.FileService;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import jakarta.annotation.Resource;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -36,10 +36,7 @@ import static cn.iocoder.yudao.module.drill.enums.ErrorCodeConstants.*;
 public class AppCollectionTaskServiceImpl implements AppCollectionTaskService {
     private static final String PENDING_QUALITY = "PENDING_QUALITY";
     private static final String COMPLETED = "COMPLETED";
-    private static final int SYNC_LIMIT = 100;
 
-    @Resource
-    private CollectionTaskMapper taskMapper;
     @Resource
     private CollectionTaskEntityMapper taskEntityMapper;
     @Resource
@@ -47,11 +44,7 @@ public class AppCollectionTaskServiceImpl implements AppCollectionTaskService {
     @Resource
     private CollectionTaskPhotoItemEntityMapper taskPhotoItemEntityMapper;
     @Resource
-    private CollectionCaptureMapper captureMapper;
-    @Resource
-    private CollectionTaskChangeMapper changeMapper;
-    @Resource
-    private CollectionPhotoMapper photoMapper;
+    private CollectionTaskPhotoFileEntityMapper taskPhotoFileEntityMapper;
     @Resource
     private FileService fileService;
 
@@ -130,80 +123,43 @@ public class AppCollectionTaskServiceImpl implements AppCollectionTaskService {
     }
 
     @Override
+    @TenantIgnore
     public AppCollectionTaskVO.Resp get(Long userId, Long id) {
-        return convert(requireTask(userId, id));
+        CollectionTaskEntity task = requireTask(userId, id);
+        return convertCreatedTask(task, requireTaskForm(id),
+                taskPhotoItemEntityMapper.selectListByTaskId(id));
     }
 
     @Override
+    @TenantIgnore
     public PageResult<AppCollectionTaskVO.Resp> getPage(Long userId, AppCollectionTaskVO.PageReq req) {
-        PageResult<CollectionTaskDO> page = taskMapper.selectPage(userId, req);
-        return new PageResult<>(page.getList().stream().map(this::convert).toList(), page.getTotal());
+        PageResult<CollectionTaskEntity> page = taskEntityMapper.selectPageByUserId(userId, req);
+        List<AppCollectionTaskVO.Resp> rows = page.getList().stream().map(task ->
+                convertCreatedTask(task, requireTaskForm(task.getId()),
+                        taskPhotoItemEntityMapper.selectListByTaskId(task.getId()))).toList();
+        return new PageResult<>(rows, page.getTotal());
     }
 
     @Override
-    public AppCollectionTaskVO.SyncResp sync(Long userId, String cursorValue) {
-        long cursor;
-        try {
-            cursor = cursorValue == null || cursorValue.isBlank() ? 0L : Long.parseLong(cursorValue);
-        } catch (NumberFormatException ex) {
-            throw exception(APP_COLLECTION_SYNC_CURSOR_INVALID);
-        }
-         List<CollectionTaskChangeDO> rows = changeMapper.selectChanges(userId, cursor, SYNC_LIMIT + 1);
-        boolean hasMore = rows.size() > SYNC_LIMIT;
-        if (hasMore) rows = new ArrayList<>(rows.subList(0, SYNC_LIMIT));
-
-        AppCollectionTaskVO.SyncResp resp = new AppCollectionTaskVO.SyncResp();
-        List<AppCollectionTaskVO.Change> changes = new ArrayList<>();
-        for (CollectionTaskChangeDO row : rows) {
-            AppCollectionTaskVO.Change item = new AppCollectionTaskVO.Change();
-            item.setRevision(row.getId());
-            item.setOperation(row.getOperation());
-            item.setClientId(row.getClientId());
-            item.setVersion(row.getTaskVersion());
-            if (!"DELETE".equals(row.getOperation())) {
-                CollectionTaskDO task = taskMapper.selectById(row.getTaskId());
-                if (task != null && Objects.equals(task.getCollectorUserId(), userId)) item.setTask(convert(task));
-            }
-            changes.add(item);
-        }
-        resp.setChanges(changes);
-        resp.setHasMore(hasMore);
-        resp.setNextCursor(rows.isEmpty() ? Long.toString(cursor)
-                : Long.toString(rows.get(rows.size() - 1).getId()));
-        return resp;
-    }
-
-    @Override
+    @TenantIgnore
     @Transactional(rollbackFor = Exception.class)
     public void deleteDraft(Long userId, Long id, Integer version) {
-        CollectionTaskDO current = taskMapper.selectById(id);
-        if (current == null) {
-            CollectionTaskChangeDO latest = changeMapper.selectLatest(userId, id);
-            if (latest != null && "DELETE".equals(latest.getOperation())) return;
-            throw exception(APP_COLLECTION_TASK_NOT_EXISTS);
-        }
-        if (!Objects.equals(current.getCollectorUserId(), userId)) throw exception(APP_COLLECTION_TASK_FORBIDDEN);
+        CollectionTaskEntity current = taskEntityMapper.selectByIdForUpdate(id);
+        if (current == null) throw exception(APP_COLLECTION_TASK_NOT_EXISTS);
+        if (!Objects.equals(current.getUserId(), userId)) throw exception(APP_COLLECTION_TASK_FORBIDDEN);
         if (!DRAFT.getCode().equals(current.getStatus())) throw exception(APP_COLLECTION_TASK_DELETE_FORBIDDEN);
-        int updated = taskMapper.update(null, new LambdaUpdateWrapper<CollectionTaskDO>()
-                .eq(CollectionTaskDO::getId, id)
-                .eq(CollectionTaskDO::getCollectorUserId, userId)
-                .eq(CollectionTaskDO::getStatus, DRAFT.getCode())
-                .eq(CollectionTaskDO::getVersion, version)
-                .set(CollectionTaskDO::getDeleted, true)
-                .setSql("version = version + 1"));
-        if (updated == 0) throw exception(APP_COLLECTION_TASK_VERSION_CONFLICT);
-        current.setVersion(current.getVersion() + 1);
-        recordChange(current, "DELETE");
+        taskEntityMapper.deleteById(id);
     }
 
     @Override
+    @TenantIgnore
     @Transactional(rollbackFor = Exception.class)
     public AppCollectionVO.PhotoResp uploadPhoto(Long userId, Long id, String captureCode,
                                                   AppCollectionVO.UploadReq req) {
-        CollectionTaskDO task = requireTask(userId, id);
+        CollectionTaskEntity task = requireTask(userId, id);
         if (!DRAFT.getCode().equals(task.getStatus())) throw exception(APP_COLLECTION_TASK_NOT_DRAFT);
-        CollectionCaptureDO capture = captureMapper.selectByTaskId(id).stream()
-                .filter(item -> Objects.equals(item.getCaptureCode(), captureCode))
+        CollectionTaskPhotoItemEntity capture = taskPhotoItemEntityMapper.selectListByTaskId(id).stream()
+                .filter(item -> Objects.equals(toCaptureCode(item), captureCode))
                 .findFirst()
                 .orElseThrow(() -> exception(APP_COLLECTION_CAPTURE_NOT_EXISTS));
         if (req.getFile() == null || req.getFile().isEmpty()) {
@@ -224,37 +180,41 @@ public class AppCollectionTaskServiceImpl implements AppCollectionTaskService {
         }
         String url = fileService.createFile(content, req.getFile().getOriginalFilename(),
                 "drill/collection/" + task.getId(), contentType);
-        CollectionPhotoDO photo = photoMapper.selectByTaskAndCapture(task.getId(), captureCode);
+        CollectionTaskPhotoFileEntity photo =
+                taskPhotoFileEntityMapper.selectByTaskAndCapture(task.getId(), captureCode);
         if (photo == null) {
-            photo = new CollectionPhotoDO().setTaskId(task.getId()).setCaptureId(captureCode);
+            photo = new CollectionTaskPhotoFileEntity().setTaskId(task.getId()).setCaptureId(captureCode);
             fillPhoto(req, url, photo);
-            photoMapper.insert(photo);
+            taskPhotoFileEntityMapper.insert(photo);
         } else {
             fillPhoto(req, url, photo);
-            photoMapper.updateById(photo);
+            taskPhotoFileEntityMapper.updateById(photo);
         }
-        capture.setState(req.getPhotoState());
-        captureMapper.updateById(capture);
+        capture.setStatus(req.getPhotoState());
+        taskPhotoItemEntityMapper.updateById(capture);
         return convertPhoto(photo);
     }
 
     @Override
+    @TenantIgnore
     @Transactional(rollbackFor = Exception.class)
     public AppCollectionTaskVO.Resp submit(Long userId, Long id) {
-        CollectionTaskDO task = requireTask(userId, id);
-        if (COMPLETED.equals(task.getStatus())) return convert(task);
+        CollectionTaskEntity task = requireTask(userId, id);
+        CollectionTaskFormEntity form = requireTaskForm(id);
+        List<CollectionTaskPhotoItemEntity> photoItems = taskPhotoItemEntityMapper.selectListByTaskId(id);
+        if (COMPLETED.equals(task.getStatus())) return convertCreatedTask(task, form, photoItems);
         if (!DRAFT.getCode().equals(task.getStatus()) && !PENDING_QUALITY.equals(task.getStatus())) {
             throw exception(APP_COLLECTION_TASK_NOT_DRAFT);
         }
 
-        List<CollectionCaptureDO> required = captureMapper.selectByTaskId(id).stream()
+        List<CollectionTaskPhotoItemEntity> required = photoItems.stream()
                 .filter(item -> Boolean.TRUE.equals(item.getRequiredFlag())).toList();
-        Map<String, CollectionPhotoDO> photos = new HashMap<>();
-        for (CollectionPhotoDO photo : photoMapper.selectListByTask(id)) {
+        Map<String, CollectionTaskPhotoFileEntity> photos = new HashMap<>();
+        for (CollectionTaskPhotoFileEntity photo : taskPhotoFileEntityMapper.selectListByTaskId(id)) {
             photos.put(photo.getCaptureId(), photo);
         }
         long usable = required.stream().filter(capture -> {
-            CollectionPhotoDO photo = photos.get(capture.getCaptureCode());
+            CollectionTaskPhotoFileEntity photo = photos.get(toCaptureCode(capture));
             return photo != null && ("PASSED".equals(photo.getPhotoState())
                     || "WARNING".equals(photo.getPhotoState()));
         }).count();
@@ -263,18 +223,21 @@ public class AppCollectionTaskServiceImpl implements AppCollectionTaskService {
         }
 
         task.setStatus(COMPLETED);
-        task.setSubmitTime(LocalDateTime.now());
-        task.setVersion(task.getVersion() + 1);
-        taskMapper.updateById(task);
-        recordChange(task, "UPSERT");
-        return convert(task);
+        taskEntityMapper.updateById(task);
+        return convertCreatedTask(task, form, photoItems);
     }
 
-    private CollectionTaskDO requireTask(Long userId, Long id) {
-        CollectionTaskDO task = taskMapper.selectById(id);
+    private CollectionTaskEntity requireTask(Long userId, Long id) {
+        CollectionTaskEntity task = taskEntityMapper.selectById(id);
         if (task == null) throw exception(APP_COLLECTION_TASK_NOT_EXISTS);
-        if (!Objects.equals(task.getCollectorUserId(), userId)) throw exception(APP_COLLECTION_TASK_FORBIDDEN);
+        if (!Objects.equals(task.getUserId(), userId)) throw exception(APP_COLLECTION_TASK_FORBIDDEN);
         return task;
+    }
+
+    private CollectionTaskFormEntity requireTaskForm(Long taskId) {
+        CollectionTaskFormEntity form = taskFormEntityMapper.selectByTaskId(taskId);
+        if (form == null) throw exception(APP_COLLECTION_TASK_NOT_EXISTS);
+        return form;
     }
 
     private boolean sameCreateRequest(CollectionTaskEntity task, CollectionTaskFormEntity form,
@@ -469,7 +432,7 @@ public class AppCollectionTaskServiceImpl implements AppCollectionTaskService {
     private AppCollectionTaskVO.Capture convertCreatedPhotoItem(CollectionTaskPhotoItemEntity item) {
         AppCollectionTaskVO.Capture result = new AppCollectionTaskVO.Capture();
         result.setId(item.getId());
-        result.setCode(item.getBladeNo() == null ? "overall" : "blade-" + item.getBladeNo());
+        result.setCode(toCaptureCode(item));
         result.setTitle(item.getTitle());
         result.setDescription(item.getBladeNo() == null
                 ? "钻头完整进入画面，保持背景简洁"
@@ -481,77 +444,22 @@ public class AppCollectionTaskServiceImpl implements AppCollectionTaskService {
         return result;
     }
 
-    private void recordChange(CollectionTaskDO task, String operation) {
-        changeMapper.insert(new CollectionTaskChangeDO()
-                .setTaskId(task.getId())
-                .setCollectorUserId(task.getCollectorUserId())
-                .setClientId(task.getClientId())
-                .setOperation(operation)
-                .setTaskVersion(task.getVersion()));
+    private String toCaptureCode(CollectionTaskPhotoItemEntity item) {
+        return item.getBladeNo() == null ? "overall" : "blade-" + item.getBladeNo();
     }
 
-    private void fillPhoto(AppCollectionVO.UploadReq req, String url, CollectionPhotoDO photo) {
+    private void fillPhoto(AppCollectionVO.UploadReq req, String url, CollectionTaskPhotoFileEntity photo) {
         photo.setPhotoType(req.getPhotoType());
         photo.setPhotoState(req.getPhotoState());
         photo.setFileUrl(url);
-        photo.setAuditRegionJson(req.getAuditRegionJson());
-        photo.setAuditReportJson(req.getAuditReportJson());
     }
 
-    private AppCollectionVO.PhotoResp convertPhoto(CollectionPhotoDO photo) {
+    private AppCollectionVO.PhotoResp convertPhoto(CollectionTaskPhotoFileEntity photo) {
         AppCollectionVO.PhotoResp result = new AppCollectionVO.PhotoResp();
         result.setCaptureId(photo.getCaptureId());
         result.setPhotoType(photo.getPhotoType());
         result.setPhotoState(photo.getPhotoState());
         result.setFileUrl(photo.getFileUrl());
-        result.setAuditRegionJson(photo.getAuditRegionJson());
-        result.setAuditReportJson(photo.getAuditReportJson());
-        return result;
-    }
-
-    private AppCollectionTaskVO.Resp convert(CollectionTaskDO task) {
-        AppCollectionTaskVO.Resp result = new AppCollectionTaskVO.Resp();
-        result.setId(task.getId());
-        result.setClientId(task.getClientId());
-        result.setTaskNo(task.getTaskNo());
-        result.setTaskType(task.getTaskType());
-        result.setStatus(task.getStatus());
-        result.setVersion(task.getVersion());
-        AppCollectionTaskVO.DrillBit drill = new AppCollectionTaskVO.DrillBit();
-        drill.setCode(task.getDrillCode());
-        drill.setType(task.getDrillType());
-        drill.setModel(task.getDrillModel());
-        drill.setSize(task.getDrillSize());
-        drill.setManufacturer(task.getManufacturer());
-        drill.setProductionBatch(task.getProductionBatch());
-        result.setDrillBit(drill);
-        AppCollectionTaskVO.Operation operation = new AppCollectionTaskVO.Operation();
-        operation.setWellNumber(task.getWellNumber());
-        operation.setWellSection(task.getWellSection());
-        operation.setFormation(task.getFormation());
-        operation.setOperationTime(task.getOperationTime());
-        operation.setFootage(task.getFootage());
-        operation.setDrillingHours(task.getDrillingHours());
-        operation.setLocation(task.getLocation());
-        operation.setNotes(task.getNotes());
-        result.setOperation(operation);
-        result.setCaptures(captureMapper.selectByTaskId(task.getId()).stream().map(this::convertCapture).toList());
-        result.setCreatedAt(task.getCreateTime());
-        result.setUpdatedAt(task.getUpdateTime());
-        result.setDeleted(false);
-        return result;
-    }
-
-    private AppCollectionTaskVO.Capture convertCapture(CollectionCaptureDO capture) {
-        AppCollectionTaskVO.Capture result = new AppCollectionTaskVO.Capture();
-        result.setId(capture.getId());
-        result.setCode(capture.getCaptureCode());
-        result.setTitle(capture.getTitle());
-        result.setDescription(capture.getDescription());
-        result.setRequired(capture.getRequiredFlag());
-        result.setBladeNo(capture.getBladeNo());
-        result.setSortNo(capture.getSortNo());
-        result.setState(capture.getState());
         return result;
     }
 }

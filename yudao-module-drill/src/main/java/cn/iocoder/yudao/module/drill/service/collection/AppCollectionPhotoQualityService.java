@@ -27,8 +27,9 @@ public class AppCollectionPhotoQualityService {
     @Resource private E11QualityGateProperties properties;
 
     public AppCollectionVO.PhotoQualityResp check(MultipartFile file) {
+        // 图像不能为空
         if (file == null || file.isEmpty()) throw exception(IMAGE_FILE_EMPTY);
-        if (file.getSize() > APP_MAX_FILE_SIZE) throw exception(IMAGE_FILE_TOO_LARGE, 30);
+//        if (file.getSize() > APP_MAX_FILE_SIZE) throw exception(IMAGE_FILE_TOO_LARGE, 30);
 
         byte[] content;
         try {
@@ -36,13 +37,13 @@ public class AppCollectionPhotoQualityService {
         } catch (IOException ex) {
             throw exception(IMAGE_DECODE_FAILED);
         }
-        ImageFileValidator.ImageInfo image = imageFileValidator.validate(
+        ImageFileValidator.ImageInfo imageInfo = imageFileValidator.validate(
                 content, file.getOriginalFilename(), APP_MAX_FILE_SIZE,
                 ImageFileValidator.MAX_PIXEL_COUNT);
 
         ImageQualityModelResult result = modelChecker.executeModel(
                 new QualityImageInput(null, content, file.getOriginalFilename(),
-                        image.getMimeType(), image.getWidth(), image.getHeight()),
+                        imageInfo.getMimeType(), imageInfo.getWidth(), imageInfo.getHeight()),
                 Map.of("confidence", properties.getAppConfidence(),
                         "minDetections", properties.getAppMinDetections()));
         AppCollectionVO.PhotoQualityResp response = new AppCollectionVO.PhotoQualityResp();

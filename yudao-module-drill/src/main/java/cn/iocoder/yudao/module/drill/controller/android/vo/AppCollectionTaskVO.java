@@ -94,19 +94,4 @@ public final class AppCollectionTaskVO {
         private String keyword;
     }
 
-    @Data
-    public static class Change {
-        private Long revision;
-        private String operation;
-        private String clientId;
-        private Integer version;
-        private Resp task;
-    }
-
-    @Data
-    public static class SyncResp {
-        private String nextCursor;
-        private Boolean hasMore;
-        private List<Change> changes = new ArrayList<>();
-    }
 }

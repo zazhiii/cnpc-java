@@ -71,13 +71,6 @@ public class AppCollectionController {
         return success(taskService.getPage(getLoginUserId(), req));
     }
 
-    @GetMapping("/tasks/sync")
-    @Operation(summary = "增量同步当前采集员任务")
-    public CommonResult<AppCollectionTaskVO.SyncResp> syncTasks(
-            @RequestParam(value = "cursor", required = false) String cursor) {
-        return success(taskService.sync(getLoginUserId(), cursor));
-    }
-
     @DeleteMapping("/tasks/{id}")
     @Operation(summary = "删除草稿任务")
     public CommonResult<Boolean> deleteTask(@PathVariable Long id,
